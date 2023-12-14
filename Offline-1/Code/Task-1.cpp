@@ -168,14 +168,14 @@ void drawSphere(double radius,int sectors,int stacks)
 {
     glPushMatrix();
     {
-        glTranslatef(0,0,radius);
+        // glTranslatef(0,0,radius);
         drawSphereHelper(radius,sectors,stacks);
     }
     glPopMatrix();
 
     glPushMatrix();
     {
-        glTranslatef(0,0,radius);
+        // glTranslatef(0,0,radius);
         glRotatef(180,0,1,0);
         drawSphereHelper(radius,sectors,stacks);
     }
@@ -247,8 +247,8 @@ void display(){
             ballPosition.z -= ballDirection.z * speed;
         }
 
-        // glTranslatef(ballPosition.x, ballPosition.y, ballPosition.z);
-        glRotatef(tempAngle, temp1, temp2, temp3+0.5);
+        glTranslatef(ballPosition.x, ballPosition.y, ballPosition.z + radius);
+        glRotatef(tempAngle, rightDirection.x, rightDirection.y, 0);
         drawSphere( radius, sectors, stacks);
     }
     glPopMatrix();
