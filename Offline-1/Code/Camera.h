@@ -87,12 +87,12 @@ public:
     }
 
     void setCamera(){
-        cout << "Camera: " << endl;
-        cout << "Eye: " << eye.x << " " << eye.y << " " << eye.z << endl;
-        cout << "LookAt: " << lookAt.x << " " << lookAt.y << " " << lookAt.z << endl;
-        cout << "Up: " << up.x << " " << up.y << " " << up.z << endl;
-        cout << "Right: " << right.x << " " << right.y << " " << right.z << endl;
-        cout << "--------------" << endl;
+        // cout << "Camera: " << endl;
+        // cout << "Eye: " << eye.x << " " << eye.y << " " << eye.z << endl;
+        // cout << "LookAt: " << lookAt.x << " " << lookAt.y << " " << lookAt.z << endl;
+        // cout << "Up: " << up.x << " " << up.y << " " << up.z << endl;
+        // cout << "Right: " << right.x << " " << right.y << " " << right.z << endl;
+        // cout << "--------------" << endl;
         gluLookAt(eye.x, eye.y, eye.z, 
                 eye.x + lookAt.x, eye.y + lookAt.y, eye.z + lookAt.z,
                 up.x, up.y, up.z);
