@@ -244,6 +244,87 @@ void drawOctahedron(){
 
 
 
+void drawCylinderFace(int slices, double radius, double height){
+    double startAngle = 70.5287794;
+    double startAngleRad = (startAngle * pi) / 180.0;
+    double increment = (startAngleRad) / slices;
+    startAngleRad /= 2.0;
+    startAngleRad *= -1.0;
+
+    point pointsOnCylinder[slices+1];
+
+
+    for(int i=0; i<=slices; i++){
+        pointsOnCylinder[i].x = radius * cos(startAngleRad);
+        pointsOnCylinder[i].y = radius * sin(startAngleRad);
+        pointsOnCylinder[i].z = 0;
+        startAngleRad += (increment);
+    }
+
+    glColor3f(1, 1, 0);
+    glPushMatrix();
+    for(int i=0; i<slices; i++){
+        glBegin(GL_QUADS);{
+            glVertex3d(pointsOnCylinder[i].x, pointsOnCylinder[i].y, -height/2.0);
+            glVertex3d(pointsOnCylinder[i].x, pointsOnCylinder[i].y, height/2.0);
+            glVertex3d(pointsOnCylinder[i+1].x, pointsOnCylinder[i+1].y, height/2.0);
+            glVertex3d(pointsOnCylinder[i+1].x, pointsOnCylinder[i+1].y, -height/2.0);
+        }glEnd();
+    }
+    glPopMatrix();
+
+}
+
+void drawAllCylinderFaces(int slices, double radius, double height){
+    for(int i=0; i<4; i++){
+        glPushMatrix();
+        {
+            glRotatef(i*90, 0, 0, 1);
+            glRotatef(-45, 0, 1, 0);
+            glTranslated(currentLengthTriangle / sqrt(2.0),0,0);
+            drawCylinderFace(slices, radius, height);
+        }
+        glPopMatrix();
+    }
+
+    glPushMatrix();
+    {
+        glRotatef(180, 0, 1, 0);
+        for(int i=0; i<4; i++){
+            glPushMatrix();
+            {
+                glRotatef(i*90, 0, 0, 1);
+                glRotatef(-45, 0, 1, 0);
+                glTranslated(currentLengthTriangle / sqrt(2.0),0,0);
+                drawCylinderFace(slices, radius, height);
+            }
+            glPopMatrix();
+        }
+    }
+    glPopMatrix();
+
+
+    glPushMatrix();
+    {
+        for(int i=0; i<4; i++){
+            glPushMatrix();
+            {
+                glRotatef(i*90, 0, 0, 1);
+                glRotatef(90, 1, 0, 0);
+                glRotatef(-45, 0, 1, 0);
+                glTranslated(currentLengthTriangle / sqrt(2.0),0,0);
+                drawCylinderFace(slices, radius, height);
+            }
+            glPopMatrix();
+        }
+    }
+    glPopMatrix();
+
+
+}
+
+
+
 void drawSquare(double a)
 {
     glColor3f(1.0,0.0,0.0);
@@ -256,12 +337,13 @@ void drawSquare(double a)
 }
 
 
-void drawWithRotation(int subdivision, double radius){
+void drawWithRotation(int subdivision, double radius, int segments, double cylinderRadius, double height){
     glPushMatrix();
     {
         glRotated(antiClockAngle, 0, 0, 1);
         drawOctahedron();
         drawSphereFromFaces(subdivision, radius);
+        drawAllCylinderFaces(segments,cylinderRadius,height);
     }
     glPopMatrix();
 }
@@ -282,7 +364,9 @@ void display(){
     axes();
     
     // drawSphereface(6, 4);
-    drawWithRotation(8, currentRadiusSphere);
+    drawWithRotation(8, currentRadiusSphere, 100, currentRadiusSphere , currentLengthTriangle * sqrt(2.0));
+    // drawCylinderFace(100, 5, 8);
+    
 
     
 
