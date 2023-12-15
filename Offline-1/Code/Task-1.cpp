@@ -42,6 +42,11 @@ point rightDirection;
 point ballUp;
 
 
+bool ballRotate = true;
+double tempRightX = 0.0;
+double tempRightY = 0.0;
+
+
 
 
 
@@ -198,6 +203,7 @@ void drawBallDirection(){
     glPopMatrix();
 }
 
+
 void drawBallRightDirection(){
     glPushMatrix();
     {
@@ -214,7 +220,6 @@ void drawBallRightDirection(){
 
 
 void updateBallDirection(){
-    cout << "Direction angle: " << directionAngleDegree << endl;
 
     double angleInRadian = (directionAngleDegree * pi) / 180.0;
     ballDirection.x = cos(angleInRadian);
@@ -244,7 +249,16 @@ void drawBall(){
         }
 
         glTranslatef(ballPosition.x, ballPosition.y, ballPosition.z + radius);
-        glRotatef(tempAngle, rightDirection.x, rightDirection.y, 0);
+
+        if(!ballRotate){
+            // cout << "Ekhon ekahne" << endl;
+            glRotatef(tempAngle, tempRightX, tempRightY, 0);
+        }
+        else{
+            // cout << ballRotate << endl;
+            glRotatef(tempAngle, rightDirection.x, rightDirection.y, 0);
+        }
+        // glRotatef(tempAngle, rightDirection.x, rightDirection.y, 0);
         drawSphere( radius, sectors, stacks);
     }
     glPopMatrix();
@@ -303,7 +317,7 @@ void init(){
 
 void idle(){
     printf("No job\n");
-    glutPostRedisplay();
+    // glutPostRedisplay();
 }
 
 void timer(int value){
@@ -335,11 +349,13 @@ void normalKeyHandler(unsigned char key, int x, int y){
         camera.tiltClockwise();
         break;
     case 'i':
+        ballRotate = true;
         isForward = true;
         speed = 0.5;
         moveAngle = (moveAngle + moveAngleRate);
         break;
     case 'k':
+        ballRotate = true;
         isForward = false;
         speed = 0.5;
         moveAngle = (moveAngle + moveAngleRate);
@@ -347,11 +363,26 @@ void normalKeyHandler(unsigned char key, int x, int y){
     case 'j':
         isForward = true;
         directionAngleDegree += moveAngleRate;
+
+        //* It solves the problem
+        if(ballRotate){
+            tempRightX = rightDirection.x;
+            tempRightY = rightDirection.y;
+        }
+        ballRotate = false;
         updateBallDirection();
         break;
     case 'l':
         isForward = true;
         directionAngleDegree -= moveAngleRate;
+
+        if(ballRotate){
+            tempRightX = rightDirection.x;
+            tempRightY = rightDirection.y;
+        }
+
+        //* It solves the problem
+        ballRotate = false;
         updateBallDirection();
         break;
     
@@ -361,6 +392,7 @@ void normalKeyHandler(unsigned char key, int x, int y){
     }
 
     glutPostRedisplay();
+    // ballRotate = true;
 }
 
 void specialKeyHandler(int key, int x, int y){
