@@ -27,7 +27,7 @@ bool animate = true;
 int moveAngle = 0;
 int moveAngleRate = 10;
 double speed = 0;
-double initialAngleDegree = 45;
+double directionAngleDegree = 45;
 double radius = 1;
 double radius2 = 1;
 double sectors = 20;
@@ -102,7 +102,7 @@ void drawSphereHelper(double radius,int sectors,int stacks)
 			// 	glVertex3f(points[i+1][j].x,points[i+1][j].y,-points[i+1][j].z);
 			// }glEnd();
 
-            if(j%2) glColor3f(1,1,0);
+            if(j%2) glColor3f(1,0,0);
             else glColor3f(0,1,0);
            
             glBegin(GL_TRIANGLES);{
@@ -213,27 +213,23 @@ void drawBallRightDirection(){
 }
 
 
-int counter = 0;
-void display(){
-    glEnable(GL_DEPTH_TEST);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
+void updateBallDirection(){
+    cout << "Direction angle: " << directionAngleDegree << endl;
 
-    //* Set Camera LookAt
-    camera.setCamera();
-    
+    double angleInRadian = (directionAngleDegree * pi) / 180.0;
+    ballDirection.x = cos(angleInRadian);
+    ballDirection.y = sin(angleInRadian);
+    ballDirection.z = 0;
 
-    // axes();
-    drawChekerBoard(checkerBoxSize);
+    rightDirection.x = sin(angleInRadian );
+    rightDirection.y = -cos(angleInRadian);
+    rightDirection.z = radius;
+}
 
+
+void drawBall(){
     glPushMatrix();
     {   
-
-        double temp1 = ballDirection.x + rightDirection.x;
-        double temp2 = ballDirection.y + rightDirection.y;
-        double temp3 = rightDirection.z;
-        
         double tempAngle;
         if(isForward){
             tempAngle = -moveAngle;   
@@ -252,6 +248,24 @@ void display(){
         drawSphere( radius, sectors, stacks);
     }
     glPopMatrix();
+}
+
+
+int counter = 0;
+void display(){
+    glEnable(GL_DEPTH_TEST);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+
+    //* Set Camera LookAt
+    camera.setCamera();
+    
+
+    // axes();
+    drawChekerBoard(checkerBoxSize);
+
+    drawBall();
 
     drawBallDirection();
     drawBallRightDirection();
@@ -276,7 +290,7 @@ void init(){
     ballPosition.y = 0;
     ballPosition.z = 0;
 
-    double angleInRadian = (initialAngleDegree * pi) / 180.0;
+    double angleInRadian = (directionAngleDegree * pi) / 180.0;
     ballDirection.x = cos(angleInRadian);
     ballDirection.y = sin(angleInRadian);
     ballDirection.z = 0;
@@ -330,9 +344,19 @@ void normalKeyHandler(unsigned char key, int x, int y){
         speed = 0.5;
         moveAngle = (moveAngle + moveAngleRate);
         break;
+    case 'j':
+        isForward = true;
+        directionAngleDegree += moveAngleRate;
+        updateBallDirection();
+        break;
+    case 'l':
+        isForward = true;
+        directionAngleDegree -= moveAngleRate;
+        updateBallDirection();
+        break;
     
     default:
-        printf("Ulta palta key");
+        printf("Ulta palta key\n");
         break;
     }
 
@@ -361,7 +385,7 @@ void specialKeyHandler(int key, int x, int y){
         camera.moveDown();
         break;
     default:
-        printf("Ulta palta key");
+        printf("Ulta palta key\n");
         break;
     }
 
