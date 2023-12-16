@@ -33,19 +33,14 @@ private:
         second->x = temp2.x;
         second->y = temp2.y;
         second->z = temp2.z;
+    }
 
+    void normalize(Point *p){
+        double length = sqrt(p->x*p->x + p->y*p->y + p->z*p->z);
 
-        
-
-        // first->x = first->x * cos(angleRate) + second->x * sin(angleRate);
-        // first->y = first->y * cos(angleRate) + second->y * sin(angleRate);
-        // first->z = first->z * cos(angleRate) + second->z * sin(angleRate);
-
-    
-        // second->x = second->x * cos(angleRate) - first->x * sin(angleRate);
-        // second->y = second->y * cos(angleRate) - first->y * sin(angleRate);
-        // second->z = second->z * cos(angleRate) - first->z * sin(angleRate);
-
+        p->x = p->x/length;
+        p->y = p->y/length;
+        p->z = p->z/length;
     }
     
 public:
@@ -76,6 +71,13 @@ public:
 
         angleRate = 0.05;
         moveRate = 0.1;
+
+        //* Normalizing the lookAt vector
+        this->normalize(&lookAt);
+
+        //* Normalizing the right vector
+        this->normalize(&right);
+
     }
 
     void setAngleRate(double rate){
@@ -102,6 +104,9 @@ public:
         lookAt.x = p.x;
         lookAt.y = p.y;
         lookAt.z = p.z;
+
+        //* Normalizing the lookAt vector
+        this->normalize(&lookAt);
     }
 
     void setEye(Point p){
@@ -114,67 +119,55 @@ public:
         right.x = p.x;
         right.y = p.y;
         right.z = p.z;
+
+        //* Normalizing the right vector
+        this->normalize(&right);
     }
 
     void setUp(Point p){
         up.x = p.x;
         up.y = p.y;
         up.z = p.z;
+
+        //* Normalizing the up vector
+        this->normalize(&up);
     }
 
     void moveForward(){
-        //* Normalizing the lookAt vector
-        double length = sqrt(lookAt.x*lookAt.x + lookAt.y*lookAt.y + lookAt.z*lookAt.z);
-
-        eye.x += (moveRate * (lookAt.x))/length;
-        eye.y += (moveRate * (lookAt.y))/length;
-        eye.z += (moveRate * (lookAt.z))/length;
+        eye.x += (moveRate * (lookAt.x));
+        eye.y += (moveRate * (lookAt.y));
+        eye.z += (moveRate * (lookAt.z));
     }
 
     void moveBackward(){
-        //* Normalizing the lookAt vector
-        double length = sqrt(lookAt.x*lookAt.x + lookAt.y*lookAt.y + lookAt.z*lookAt.z);
-
-        eye.x -= (moveRate * (lookAt.x))/length;
-        eye.y -= (moveRate * (lookAt.y))/length;
-        eye.z -= (moveRate * (lookAt.z))/length;
+        eye.x -= (moveRate * (lookAt.x));
+        eye.y -= (moveRate * (lookAt.y));
+        eye.z -= (moveRate * (lookAt.z));
     }
 
     void moveRight(){
-        //* Normalizing the right vector
-        double length = sqrt(right.x*right.x + right.y*right.y + right.z*right.z);
-
-        eye.x += (moveRate * (right.x))/length;
-        eye.y += (moveRate * (right.y))/length;
-        eye.z += (moveRate * (right.z))/length;
+        eye.x += (moveRate * (right.x));
+        eye.y += (moveRate * (right.y));
+        eye.z += (moveRate * (right.z));
     }
 
     void moveLeft(){
-        //* Normalizing the right vector
-        double length = sqrt(right.x*right.x + right.y*right.y + right.z*right.z);
-
-        eye.x -= (moveRate * (right.x))/length;
-        eye.y -= (moveRate * (right.y))/length;
-        eye.z -= (moveRate * (right.z))/length;
+        eye.x -= (moveRate * (right.x));
+        eye.y -= (moveRate * (right.y));
+        eye.z -= (moveRate * (right.z));
 
     }
 
     void moveUp(){
-        //* Normalizing the up vector
-        double length = sqrt(up.x*up.x + up.y*up.y + up.z*up.z);
-
-        eye.x += (moveRate * (up.x))/length;
-        eye.y += (moveRate * (up.y))/length;
-        eye.z += (moveRate * (up.z))/length;
+        eye.x += (moveRate * (up.x));
+        eye.y += (moveRate * (up.y));
+        eye.z += (moveRate * (up.z));
     }
 
     void moveDown(){
-        //* Normalizing the up vector
-        double length = sqrt(up.x*up.x + up.y*up.y + up.z*up.z);
-
-        eye.x -= (moveRate * (up.x))/length;
-        eye.y -= (moveRate * (up.y))/length;
-        eye.z -= (moveRate * (up.z))/length;
+        eye.x -= (moveRate * (up.x));
+        eye.y -= (moveRate * (up.y));
+        eye.z -= (moveRate * (up.z));
     }
 
 
@@ -187,11 +180,11 @@ public:
     }
 
     void lookUp(){
-        rotate(&lookAt, &up, -angleRate);
+        rotate(&lookAt, &up, angleRate);
     }
 
     void lookDown(){
-        rotate(&lookAt, &up, angleRate);
+        rotate(&lookAt, &up, -angleRate);
     }
 
     void tiltClockwise(){
