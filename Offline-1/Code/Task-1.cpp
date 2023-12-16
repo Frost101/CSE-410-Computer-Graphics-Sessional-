@@ -6,6 +6,7 @@
     #include<glut.h>
 #endif
 #include "Camera.h"
+#include "Boundary.h"
 #define pi (2*acos(0.0))
 using namespace std;
 
@@ -45,6 +46,10 @@ point ballUp;
 bool ballRotate = true;
 double tempRightX = 0.0;
 double tempRightY = 0.0;
+
+
+//* To draw boundary
+Boundary boundary(1);
 
 
 
@@ -169,6 +174,9 @@ void drawSquare(double a)
 }
 
 
+
+
+
 void drawSphere(double radius,int sectors,int stacks)
 {
     glPushMatrix();
@@ -265,6 +273,64 @@ void drawBall(){
 }
 
 
+void drawCone(double radius,double height,int segments)
+{
+    int i;
+    double shade;
+    struct point points[100];
+    //generate points
+    for(i=0;i<=segments;i++)
+    {
+        points[i].x=radius*cos(((double)i/(double)segments)*2*pi);
+        points[i].y=radius*sin(((double)i/(double)segments)*2*pi);
+    }
+    //draw triangles using generated points
+    for(i=0;i<segments;i++)
+    {
+        //create shading effect
+        if(i<segments/2)shade=2*(double)i/(double)segments;
+        else shade=2*(1.0-(double)i/(double)segments);
+        glColor3f(0, 0, 1);
+
+        glBegin(GL_TRIANGLES);
+        {
+            glVertex3f(0,0,height);
+			glVertex3f(points[i].x,points[i].y,0);
+			glVertex3f(points[i+1].x,points[i+1].y,0);
+        }
+        glEnd();
+    }
+}
+
+
+void drawConeWithRotation(double Radius,double height,int segments){
+    glPushMatrix();
+    {
+        
+        glTranslatef(ballPosition.x, ballPosition.y, ballPosition.z + radius);
+        glTranslatef(2*ballDirection.x,
+                    2*ballDirection.y,
+                    2*ballDirection.z);
+        glRotatef(directionAngleDegree, 0, 0, 1);
+        glRotatef(90, 0, 1, 0);
+        drawCone(Radius, height, segments);
+    }
+    glPopMatrix();
+}
+
+
+
+void drawBoundary(){
+    glPushMatrix();
+    {
+        boundary.draw();
+    }
+    glPopMatrix();
+
+}
+
+
+
 int counter = 0;
 void display(){
     glEnable(GL_DEPTH_TEST);
@@ -278,13 +344,36 @@ void display(){
 
     // axes();
     drawChekerBoard(checkerBoxSize);
+    drawBoundary();
 
     drawBall();
 
+    // drawCone(0.1,0.4,20);
+    drawConeWithRotation( 0.1, 0.4, 20);
+
     drawBallDirection();
     drawBallRightDirection();
-    speed = 0;
 
+
+    //* Check For Collision
+    if(boundary.checkCollision(ballPosition.x, ballPosition.y, ballPosition.z + radius, radius)){
+        cout << "Collision" << endl;
+        double tempDirectionX = ballDirection.x ;
+        double tempDirectionY = ballDirection.y ;
+        double tempDirectionZ = ballDirection.z + radius;
+        boundary.updateBallDirectionAfterCollision(ballPosition.x, ballPosition.y, ballPosition.z + radius, tempDirectionX, tempDirectionY, tempDirectionZ , radius);
+        ballDirection.x = tempDirectionX;
+        ballDirection.y = tempDirectionY;
+        ballDirection.z = 0;  //* Shudhu xy plane e move korbe
+
+        //* Update direction angle
+        directionAngleDegree = atan2(ballDirection.y, ballDirection.x) * 180.0 / pi;
+
+        //* Update right direction
+        updateBallDirection();
+    }
+
+    speed = 0;
     glutSwapBuffers();
 }
 
@@ -312,6 +401,13 @@ void init(){
     rightDirection.x = ballDirection.x;
     rightDirection.y = -ballDirection.y;
     rightDirection.z = radius;
+
+
+    //* Draw Boundary
+    boundary.addPoint(15.0,0);
+    boundary.addPoint(0,15.0);
+    boundary.addPoint(-15.0,0);
+    boundary.addPoint(0,-15.0); 
 
 }
 
