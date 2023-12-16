@@ -10,10 +10,21 @@
 #define pi (2*acos(0.0))
 using namespace std;
 
+
+//* Function Prototype
+void eventScheduler();
+void collisionScheduler(int value);
+
+
+
 struct point
 {
 	double x,y,z;
 };
+
+//* Time
+double timeElapsed = 0.0;
+
 
 //* Camera
 Camera camera;
@@ -245,10 +256,12 @@ void drawBall(){
     {   
         double tempAngle;
         if(isForward){
-            tempAngle = -moveAngle;   
-            ballPosition.x += ballDirection.x * speed;
-            ballPosition.y += ballDirection.y * speed;
-            ballPosition.z += ballDirection.z * speed;
+            if(!animate){
+                ballPosition.x += ballDirection.x * speed;
+                ballPosition.y += ballDirection.y * speed;
+                ballPosition.z += ballDirection.z * speed;
+            }
+            tempAngle = -moveAngle;
         }else{
             tempAngle = moveAngle;
             ballPosition.x -= ballDirection.x * speed;
@@ -331,6 +344,58 @@ void drawBoundary(){
 
 
 
+void eventScheduler(){
+    if(animate){
+        vector<double> distances = boundary.measureDistanceFromBallToWall(ballPosition.x, ballPosition.y, ballPosition.z , ballDirection.x, ballDirection.y, ballDirection.z , radius);
+
+        cout << "***********************************" << endl;
+        for(int i=0; i<distances.size(); i++){
+            if(distances[i] < 0)continue;
+            double nextCollisionTime = (distances[i]*0.05)/speed;
+
+            if(nextCollisionTime  > 999999999)continue;
+            unsigned int nextCollisionTimeInMilliSecond = (nextCollisionTime * 1000);
+            cout << "Next Collision Time: " << nextCollisionTimeInMilliSecond << endl;
+            glutTimerFunc(nextCollisionTimeInMilliSecond, collisionScheduler, 0);
+        }
+        cout << "***********************************" << endl;
+    }
+}
+
+
+
+void collisionScheduler(int value){
+    cout << "Collision Scheduler" << endl;
+    cout << "Ball Position: " << ballPosition.x << " " << ballPosition.y << " " << ballPosition.z << endl;
+
+    // cout <<  boundary.calculateDistance(ballPosition.x, ballPosition.y, ballPosition.z + radius, radius) << endl;
+
+
+    if(boundary.checkCollision(ballPosition.x, ballPosition.y, ballPosition.z + radius, radius)){
+        cout << "Collision  yeeeeeee" << endl;
+        double tempDirectionX = ballDirection.x ;
+        double tempDirectionY = ballDirection.y ;
+        double tempDirectionZ = ballDirection.z + radius;
+        boundary.updateBallDirectionAfterCollision(ballPosition.x, ballPosition.y, ballPosition.z + radius, tempDirectionX, tempDirectionY, tempDirectionZ , radius);
+        ballDirection.x = tempDirectionX;
+        ballDirection.y = tempDirectionY;
+        ballDirection.z = 0;  //* Shudhu xy plane e move korbe
+
+        //* Update direction angle
+        directionAngleDegree = atan2(ballDirection.y, ballDirection.x) * 180.0 / pi;
+
+        //* Update right direction
+        updateBallDirection();
+        eventScheduler();
+        glutPostRedisplay();
+    }
+}
+
+
+
+
+
+
 int counter = 0;
 void display(){
     glEnable(GL_DEPTH_TEST);
@@ -346,6 +411,7 @@ void display(){
     drawChekerBoard(checkerBoxSize);
     drawBoundary();
 
+    //updateBallDirection();
     drawBall();
 
     // drawCone(0.1,0.4,20);
@@ -356,8 +422,9 @@ void display(){
 
 
     //* Check For Collision
-    if(boundary.checkCollision(ballPosition.x, ballPosition.y, ballPosition.z + radius, radius)){
+    if(boundary.checkCollision(ballPosition.x, ballPosition.y, ballPosition.z + radius, radius && animate == false)){
         cout << "Collision" << endl;
+        cout << "Ball Position: " << ballPosition.x << " " << ballPosition.y << " " << ballPosition.z << endl;
         double tempDirectionX = ballDirection.x ;
         double tempDirectionY = ballDirection.y ;
         double tempDirectionZ = ballDirection.z + radius;
@@ -372,6 +439,11 @@ void display(){
         //* Update right direction
         updateBallDirection();
     }
+
+
+
+    //* Check for distance from ball to wall for collision
+    // eventScheduler();
 
     if(!animate)
         speed = 0;
@@ -424,9 +496,13 @@ void timer(int value){
         isForward = true;
         speed = 0.5;
         moveAngle = (moveAngle + moveAngleRate);
+        ballPosition.x += ballDirection.x * speed;
+        ballPosition.y += ballDirection.y * speed;
+        ballPosition.z += ballDirection.z * speed;
+
         glutPostRedisplay();
+        glutTimerFunc(50,timer,0);
     }
-    glutTimerFunc(50,timer,0);
 }
 
 
@@ -476,6 +552,9 @@ void normalKeyHandler(unsigned char key, int x, int y){
             tempRightX = rightDirection.x;
             tempRightY = rightDirection.y;
         }
+        if(animate){
+            eventScheduler();
+        }
         ballRotate = false;
         updateBallDirection();
         break;
@@ -488,6 +567,10 @@ void normalKeyHandler(unsigned char key, int x, int y){
             tempRightY = rightDirection.y;
         }
 
+        if(animate){
+            eventScheduler();
+        }
+
         //* It solves the problem
         ballRotate = false;
         updateBallDirection();
@@ -495,6 +578,11 @@ void normalKeyHandler(unsigned char key, int x, int y){
     case ' ':
         animate = !animate;
         if(!animate)speed = 0.0;
+        else{
+            speed = 0.5;
+            eventScheduler();
+            glutTimerFunc(50,timer,0);
+        }
         break;
     
     default:
@@ -549,7 +637,7 @@ int main(int argc, char** argv){
     glutDisplayFunc(display);
 
     //glutIdleFunc(idle);
-    glutTimerFunc(50,timer,0);
+    // glutTimerFunc(50,timer,0);
     glutKeyboardFunc(normalKeyHandler);
     glutSpecialFunc(specialKeyHandler);
 

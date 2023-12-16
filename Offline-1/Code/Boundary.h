@@ -60,7 +60,8 @@ class Boundary{
         int n;
         vector<BoundaryPoint> points;  
         vector<BoundaryPlanes> planes;
-        double height;     
+        double height;    
+        bool flag = true;
         Boundary(double height){
             n = 0;
             this->height = height;
@@ -99,10 +100,25 @@ class Boundary{
                     P3.z = height;
 
                     BoundaryPlanes plane(P1,P2,P3);
+
+                    if(flag)
                     planes.push_back(plane);
                 }glEnd();
             }
+            flag = false;
         }
+
+
+        double calculateDistance(double x, double y, double z, double radius){
+            for(int i=0;i<planes.size();i++){
+                BoundaryPlanes plane = planes[i];
+                double d = (plane.normal.x * (x - plane.P1.x) + plane.normal.y * (y - plane.P1.y) + plane.normal.z * (z - plane.P1.z))/sqrt(plane.normal.x * plane.normal.x + plane.normal.y * plane.normal.y + plane.normal.z * plane.normal.z);
+
+                return abs(d);
+                  
+            }
+        }
+
 
         bool checkCollision(double x, double y, double z, double radius){
             
@@ -133,5 +149,35 @@ class Boundary{
                 }
             }
         }
+
+
+        vector<double> measureDistanceFromBallToWall(double posX, double posY, double posZ, double dirX, double dirY, double dirZ, double radius){
+            vector<double> distances;
+            for(int i=0;i<planes.size();i++){
+                BoundaryPlanes plane = planes[i];
+                double d = (plane.normal.x * (posX - plane.P1.x) + plane.normal.y * (posY - plane.P1.y) + plane.normal.z * (posZ - plane.P1.z))/sqrt(plane.normal.x * plane.normal.x + plane.normal.y * plane.normal.y + plane.normal.z * plane.normal.z);
+               
+                //* Angle Between the normal vector and ball's direction vector
+                double angle = acos((dirX * plane.normal.x + dirY * plane.normal.y + (dirZ) * plane.normal.z)/(sqrt(dirX * dirX + dirY * dirY + dirZ * dirZ) * sqrt(plane.normal.x * plane.normal.x + plane.normal.y * plane.normal.y + plane.normal.z * plane.normal.z)));
+                cout << "Angle in degree: " << angle * 180 / 3.1416 << endl;
+                double distance = d/cos(angle);
+                distances.push_back(abs(distance)-radius);
+                cout << "Distance: " << distance << endl;
+            }
+            cout << "-------------------" << endl;
+            return distances;
+        }
+
+
+
+
+        // void calculateDistanceFromBallToWall(BoundaryPlanes plane, double posX, double posY, double posZ, double dirX, double dirY, double dirZ, double radius){
+        //     double d = (plane.normal.x * (posX - plane.P1.x) + plane.normal.y * (posY - plane.P1.y) + plane.normal.z * (posZ - plane.P1.z))/sqrt(plane.normal.x * plane.normal.x + plane.normal.y * plane.normal.y + plane.normal.z * plane.normal.z);
+           
+        //     //* Angle Between the normal vector and ball's direction vector
+        //     double angle = acos((dirX * plane.normal.x + dirY * plane.normal.y + (dirZ) * plane.normal.z)/(sqrt(dirX * dirX + dirY * dirY + dirZ * dirZ) * sqrt(plane.normal.x * plane.normal.x + plane.normal.y * plane.normal.y + plane.normal.z * plane.normal.z)));
+        //     double distance = d/cos(angle);
+        //     cout << "Distance: " << distance << endl;
+        // }
         
 };
