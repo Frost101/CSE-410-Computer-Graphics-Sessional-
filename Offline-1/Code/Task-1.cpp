@@ -22,7 +22,7 @@ Camera camera;
 int drawgrid = 1;
 double checkerBoxSize = 2;
 
-bool animate = true;
+bool animate = false;
 
 //* Ball-Sphere
 int moveAngle = 0;
@@ -373,7 +373,8 @@ void display(){
         updateBallDirection();
     }
 
-    speed = 0;
+    if(!animate)
+        speed = 0;
     glutSwapBuffers();
 }
 
@@ -417,9 +418,15 @@ void idle(){
 }
 
 void timer(int value){
-    glutPostRedisplay();
-    printf("Timer function called %d\n",counter);
-    glutTimerFunc(100,timer,0);
+    // cout << "Animate e aschi" << endl;
+    if(animate){
+        ballRotate = true;
+        isForward = true;
+        speed = 0.5;
+        moveAngle = (moveAngle + moveAngleRate);
+        glutPostRedisplay();
+    }
+    glutTimerFunc(50,timer,0);
 }
 
 
@@ -445,16 +452,20 @@ void normalKeyHandler(unsigned char key, int x, int y){
         camera.tiltClockwise();
         break;
     case 'i':
-        ballRotate = true;
-        isForward = true;
-        speed = 0.5;
-        moveAngle = (moveAngle + moveAngleRate);
+        if(!animate){
+            ballRotate = true;
+            isForward = true;
+            speed = 0.5;
+            moveAngle = (moveAngle + moveAngleRate);
+        }
         break;
     case 'k':
-        ballRotate = true;
-        isForward = false;
-        speed = 0.5;
-        moveAngle = (moveAngle + moveAngleRate);
+        if(!animate){
+            ballRotate = true;
+            isForward = false;
+            speed = 0.5;
+            moveAngle = (moveAngle + moveAngleRate);
+        }
         break;
     case 'j':
         isForward = true;
@@ -480,6 +491,10 @@ void normalKeyHandler(unsigned char key, int x, int y){
         //* It solves the problem
         ballRotate = false;
         updateBallDirection();
+        break;
+    case ' ':
+        animate = !animate;
+        if(!animate)speed = 0.0;
         break;
     
     default:
@@ -534,7 +549,7 @@ int main(int argc, char** argv){
     glutDisplayFunc(display);
 
     //glutIdleFunc(idle);
-    //glutTimerFunc(1000,timer,0);
+    glutTimerFunc(50,timer,0);
     glutKeyboardFunc(normalKeyHandler);
     glutSpecialFunc(specialKeyHandler);
 
