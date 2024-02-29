@@ -559,7 +559,7 @@ class Object
         }
 
         //* getColorAt function
-        Color getColorAt(Point p){
+        virtual Color getColorAt(Point p){
             return color;
         }
 };
@@ -985,12 +985,172 @@ class Floor : public Object
             }
         }
 
-        void draw(){
+        virtual void draw(){
             glPushMatrix();
             {
                 drawChekerBoard();
             }
             glPopMatrix();
+        }
+
+
+        virtual Color getColorAt(Point p){
+            int i = (p.x - reference_point.x) / tileWidth;
+            int j = (p.y - reference_point.y) / tileWidth;
+
+            //* If the point is outside the floor
+            if(i < 0 || j < 0 || i > floorWidth/tileWidth || j > floorWidth/tileWidth){
+                return Color(0, 0, 0);
+            }
+
+            if((i+j)%2 == 0){
+                return Color(0, 0, 0);
+            }else{
+                return Color(1, 1, 1);
+            }
+        }
+
+
+        virtual double intersect(Ray *r, Color *color, int level){
+
+            Point normal;
+            normal.x = 0;
+            normal.y = 0;
+            normal.z = 1;
+
+            double t = -1.0;
+
+            //* If the ray is parallel to the floor
+            //* Then the ray will never intersect the floor
+            //* Dot product of the ray direction and the normal will be 0
+            if((r->dir.x * normal.x + r->dir.y * normal.y + r->dir.z * normal.z) * 1000 == 0){
+                return -1.0;
+            }
+
+            //* t = -(ray.start * normal) / (ray.dir . normal)
+            t = -((r->start.x * normal.x + r->start.y * normal.y + r->start.z * normal.z) / (r->dir.x * normal.x + r->dir.y * normal.y + r->dir.z * normal.z));
+
+            //* point = ray.start + t * ray.dir
+            Point point;
+            point.x = r->start.x + t * r->dir.x;
+            point.y = r->start.y + t * r->dir.y;
+            point.z = r->start.z + t * r->dir.z;
+
+            //* If the point is outside the floor
+            if(point.x <= reference_point.x || point.x >= abs(reference_point.x) && point.y <= reference_point.y && point.y >= abs(reference_point.y)){
+                return -1.0;
+            }
+
+            if(level == 0){
+                return t;
+            }
+
+
+            if(t < 0){
+                return -1.0;
+            }
+
+
+    
+
+            //^ For pointLight Sources
+            //* interSectionPoint = r->start + r->dir * t
+            Point interSectionPoint;
+            interSectionPoint.x = r->start.x + (r->dir.x * t);
+            interSectionPoint.y = r->start.y + (r->dir.y * t);
+            interSectionPoint.z = r->start.z + (r->dir.z * t);
+
+            //* interSectionPointColor = getColorAt(interSectionPoint)
+            Color interSectionPointColor = getColorAt(interSectionPoint);
+          
+            //* color = interSectionPointColor * coEfficients[AMB]
+            getAmbientColor(color, &interSectionPointColor);
+
+            
+
+            normal.normalize();
+
+            //* For each point light pl in pointLights
+            //*     cast ray1 from pl.light_pos to interSectionPoint
+
+            for(int i=0; i<pointLights.size(); i++){
+                PointLight *pl = pointLights[i];
+                Point rayDirection ;
+                rayDirection.x = interSectionPoint.x - pl->position.x;
+                rayDirection.y = interSectionPoint.y - pl->position.y;
+                rayDirection.z = interSectionPoint.z - pl->position.z;  
+                rayDirection.normalize();
+
+                Ray ray1(pl->position, rayDirection);
+
+                //* if intersectionPoint is in shadow, the diffuse
+                //* and specular components need not be calculated
+                //* if ray1 is not obscured by any object
+                bool isObscured = false;
+
+                //* epsilon
+                double epsilon = 1e-5;
+
+                //* Calculate the length between the light source and the intersection point
+                //* If the length is less than epsilon, then the light source is inside the object
+                double length = sqrt((interSectionPoint.x - pl->position.x)*(interSectionPoint.x - pl->position.x) + (interSectionPoint.y - pl->position.y)*(interSectionPoint.y - pl->position.y) + (interSectionPoint.z - pl->position.z)*(interSectionPoint.z - pl->position.z));
+
+                if(length < epsilon){
+                    continue;
+                }
+
+                for(int j=0; j<objects.size(); j++){
+                    double tTmp = objects[j]->intersect(&ray1, color, 0);
+                    if(tTmp > 0 && (tTmp + epsilon) < length){
+                        isObscured = true;
+                        break;
+                    }
+                }
+
+
+                if(!isObscured){
+                    //* If ray1 is not obscured by any object
+                    //* Calculate lambertValue using normal, ray1
+                    double lambertValue = (normal.x * -rayDirection.x) + (normal.y * -rayDirection.y) + (normal.z * -rayDirection.z);
+                    if(lambertValue < 0){
+                        lambertValue = 0.0;
+                    }
+                    
+
+                    //* Find reflected ray, rayr for ray1
+                    Point reflectedRayDir;
+                    reflectedRayDir.x = ray1.dir.x - 2 * (normal.x * ray1.dir.x + normal.y * ray1.dir.y + normal.z * ray1.dir.z) * normal.x;
+                    reflectedRayDir.y = ray1.dir.y - 2 * (normal.x * ray1.dir.x + normal.y * ray1.dir.y + normal.z * ray1.dir.z) * normal.y;
+                    reflectedRayDir.z = ray1.dir.z - 2 * (normal.x * ray1.dir.x + normal.y * ray1.dir.y + normal.z * ray1.dir.z) * normal.z;
+
+                    reflectedRayDir.normalize();
+                    Ray reflectedRay(interSectionPoint, reflectedRayDir);
+
+                    //* Calculate the phong using r, reflectedRay
+                    double phong = (reflectedRayDir.x * -r->dir.x) + (reflectedRayDir.y * -r->dir.y) + (reflectedRayDir.z * -r->dir.z);
+                    if(phong < 0){
+                        phong = 0.0;
+                    }
+
+                    //*Update color using lambertValue, phong, pl.color, coEfficients[DIFF], coEfficients[SPEC]
+                    //* color += pl.color * (coEfficients[DIFF] * lambertValue * interSectionPointColor)
+                    //* color += pl.color * (coEfficients[SPEC] * pow(phong, shine) * interSectionPointColor)
+
+                    color->r += pl->color.r * (coEfficients[DIFF] * lambertValue * interSectionPointColor.r);
+                    color->r += pl->color.r * (coEfficients[SPEC] * pow(phong, shine) * interSectionPointColor.r);
+
+                    color->g += pl->color.g * (coEfficients[DIFF] * lambertValue * interSectionPointColor.g);
+                    color->g += pl->color.g * (coEfficients[SPEC] * pow(phong, shine) * interSectionPointColor.g);
+
+                    color->b += pl->color.b * (coEfficients[DIFF] * lambertValue * interSectionPointColor.b);
+                    color->b += pl->color.b * (coEfficients[SPEC] * pow(phong, shine) * interSectionPointColor.b);
+
+                }
+
+            }
+
+            return t;
+
         }
 };
 
