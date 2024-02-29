@@ -370,7 +370,7 @@ void loadData(){
     Floor *floor = new Floor(1000, 20);
     floor->setCoEfficients(0.25, 0.25, 0.25, 0.25);
     floor->setShine(15);
-    // objects.push_back(floor);
+    objects.push_back(floor);
 
     cout << "Load data done" << endl;
     sceneFile.close();
