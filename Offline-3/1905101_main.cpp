@@ -43,7 +43,7 @@ bitmap_image image;
 double viewAngle = 80.0;
 int window_width = 680;
 int window_height = 680;
-
+int image_count = 11;
 
 
 
@@ -143,8 +143,10 @@ void Capture(){
     }
 
     //* Save the image
-    image.save_image("out.bmp");
+    string file_name = "out" + to_string(image_count) + ".bmp";
+    image.save_image(file_name);
     cout << "Image saved" << endl;
+    image_count++;
 
 
 }
