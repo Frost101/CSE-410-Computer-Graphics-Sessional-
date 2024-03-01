@@ -111,7 +111,7 @@ void Capture(){
             //*     update t so that it stores min +ve value
             //*     save the nearest object, On
 
-            
+            cout << "i: " << i << " j: " << j << endl;
             for(int k=0; k<objects.size(); k++){
                 double t = objects[k]->intersect(&ray, &color, 0);
                 if(t > 0 && (t < nearestT || nearestObjectIndex == -1)){
@@ -220,8 +220,8 @@ void loadData(){
             double shininess;
             sceneFile >> shininess;
 
-            // Object *triangle = new Triangle(p1, p2, p3, color, ambient, diffuse, specular, recursive_reflection_coefficient, shininess);
-            // objects.push_back(triangle);
+            Object *triangle = new Triangle(p1, p2, p3, color, ambient, diffuse, specular, recursive_reflection_coefficient, shininess);
+            objects.push_back(triangle);
 
             cout << "Triangle\n";
             cout << p1.x << " " << p1.y << " " << p1.z << endl;
