@@ -295,6 +295,10 @@ void loadData(){
             double shininess;
             sceneFile >> shininess;
 
+            //*General(double A, double B, double C, double D, double E, double F, double G, double H, double I, double J, Color color, double ambient, double diffuse, double specular, double reflection, int shine, Point cube_reference_point, double length, double width, double height)
+            Object *general = new General(A, B, C, D, E, F, G, H, I, J, color, ambient, diffuse, specular, recursive_reflection_coefficient, shininess, cube_reference_point, length, width, height);
+            objects.push_back(general);
+
             cout << "General\n";
             cout << A << " " << B << " " << C << " " << D << " " << E << " " << F << " " << G << " " << H << " " << I << " " << J << endl;
             cout << cube_reference_point.x << " " << cube_reference_point.y << " " << cube_reference_point.z << endl;
@@ -462,6 +466,12 @@ void normalKeyHandler(unsigned char key, int x, int y){
         break;
     case '0':
         Capture();
+        break;
+    case 'w':
+        camera.upWithNoRefChange();
+        break;
+    case 's':
+        camera.downWithNoRefChange();
         break;
     default:
         printf("Ulta palta key\n");
