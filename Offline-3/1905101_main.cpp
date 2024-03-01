@@ -225,14 +225,14 @@ void loadData(){
             Object *triangle = new Triangle(p1, p2, p3, color, ambient, diffuse, specular, recursive_reflection_coefficient, shininess);
             objects.push_back(triangle);
 
-            cout << "Triangle\n";
-            cout << p1.x << " " << p1.y << " " << p1.z << endl;
-            cout << p2.x << " " << p2.y << " " << p2.z << endl;
-            cout << p3.x << " " << p3.y << " " << p3.z << endl;
-            cout << color.r << " " << color.g << " " << color.b << endl;
-            cout << ambient << " " << diffuse << " " << specular << " " << recursive_reflection_coefficient << endl;
-            cout << shininess << endl;
-            cout << endl;
+            // cout << "Triangle\n";
+            // cout << p1.x << " " << p1.y << " " << p1.z << endl;
+            // cout << p2.x << " " << p2.y << " " << p2.z << endl;
+            // cout << p3.x << " " << p3.y << " " << p3.z << endl;
+            // cout << color.r << " " << color.g << " " << color.b << endl;
+            // cout << ambient << " " << diffuse << " " << specular << " " << recursive_reflection_coefficient << endl;
+            // cout << shininess << endl;
+            // cout << endl;
         }
         else if(object_type == "sphere"){
             /*
@@ -262,13 +262,13 @@ void loadData(){
             objects.push_back(sphere);
            
 
-            cout << "Sphere\n";
-            cout << center.x << " " << center.y << " " << center.z << endl;
-            cout << radius << endl;
-            cout << color.r << " " << color.g << " " << color.b << endl;
-            cout << ambient << " " << diffuse << " " << specular << " " << recursive_reflection_coefficient << endl;
-            cout << shininess << endl;
-            cout << endl;
+            // cout << "Sphere\n";
+            // cout << center.x << " " << center.y << " " << center.z << endl;
+            // cout << radius << endl;
+            // cout << color.r << " " << color.g << " " << color.b << endl;
+            // cout << ambient << " " << diffuse << " " << specular << " " << recursive_reflection_coefficient << endl;
+            // cout << shininess << endl;
+            // cout << endl;
         }
         else if(object_type == "general"){
             /*
@@ -301,19 +301,19 @@ void loadData(){
             Object *general = new General(A, B, C, D, E, F, G, H, I, J, color, ambient, diffuse, specular, recursive_reflection_coefficient, shininess, cube_reference_point, length, width, height);
             objects.push_back(general);
 
-            cout << "General\n";
-            cout << A << " " << B << " " << C << " " << D << " " << E << " " << F << " " << G << " " << H << " " << I << " " << J << endl;
-            cout << cube_reference_point.x << " " << cube_reference_point.y << " " << cube_reference_point.z << endl;
-            cout << length << " " << width << " " << height << endl;
-            cout << color.r << " " << color.g << " " << color.b << endl;
-            cout << ambient << " " << diffuse << " " << specular << " " << recursive_reflection_coefficient << endl;
-            cout << shininess << endl;
-            cout << endl;
+            // cout << "General\n";
+            // cout << A << " " << B << " " << C << " " << D << " " << E << " " << F << " " << G << " " << H << " " << I << " " << J << endl;
+            // cout << cube_reference_point.x << " " << cube_reference_point.y << " " << cube_reference_point.z << endl;
+            // cout << length << " " << width << " " << height << endl;
+            // cout << color.r << " " << color.g << " " << color.b << endl;
+            // cout << ambient << " " << diffuse << " " << specular << " " << recursive_reflection_coefficient << endl;
+            // cout << shininess << endl;
+            // cout << endl;
         }
     }
 
     sceneFile >> light_point_count;
-    cout << "Light Point Count: " << light_point_count << endl;
+    // cout << "Light Point Count: " << light_point_count << endl;
 
     for(int i=0; i<light_point_count; i++){
         /*
@@ -331,14 +331,14 @@ void loadData(){
         PointLight *pointLight = new PointLight(light_position, light_color);
         pointLights.push_back(pointLight);
 
-        cout << "Light\n";
-        cout << light_position.x << " " << light_position.y << " " << light_position.z << endl;
-        cout << light_color.r << " " << light_color.g << " " << light_color.b << endl;
-        cout << endl;
+        // cout << "Light\n";
+        // cout << light_position.x << " " << light_position.y << " " << light_position.z << endl;
+        // cout << light_color.r << " " << light_color.g << " " << light_color.b << endl;
+        // cout << endl;
     }
 
     sceneFile >> spot_light_count;
-    cout << "Spot Light Count: " << spot_light_count << endl;
+    // cout << "Spot Light Count: " << spot_light_count << endl;
 
    
 
@@ -364,12 +364,12 @@ void loadData(){
         SpotLight *spotLight = new SpotLight(light_position, light_color, light_direction, cutoff_angle);
         spotLights.push_back(spotLight);
 
-        cout << "Spot Light\n";
-        cout << light_position.x << " " << light_position.y << " " << light_position.z << endl;
-        cout << light_color.r << " " << light_color.g << " " << light_color.b << endl;
-        cout << light_direction.x << " " << light_direction.y << " " << light_direction.z << endl;
-        cout << cutoff_angle << endl;
-        cout << endl;
+        // cout << "Spot Light\n";
+        // cout << light_position.x << " " << light_position.y << " " << light_position.z << endl;
+        // cout << light_color.r << " " << light_color.g << " " << light_color.b << endl;
+        // cout << light_direction.x << " " << light_direction.y << " " << light_direction.z << endl;
+        // cout << cutoff_angle << endl;
+        // cout << endl;
     }
 
 
@@ -476,7 +476,7 @@ void normalKeyHandler(unsigned char key, int x, int y){
         camera.downWithNoRefChange();
         break;
     default:
-        printf("Ulta palta key\n");
+        printf("Wrong key\n");
         break;
     }
 
@@ -504,6 +504,27 @@ void specialKeyHandler(int key, int x, int y){
     case GLUT_KEY_PAGE_DOWN:
         camera.moveDown();
         break;
+    case GLUT_KEY_HOME:
+        //* free all objects and lights
+        for(int i=0; i<objects.size(); i++){
+            delete objects[i];
+        }
+        objects.clear();
+        objects.shrink_to_fit();
+
+        for(int i=0; i<pointLights.size(); i++){
+            delete pointLights[i];
+        }
+        pointLights.clear();
+        pointLights.shrink_to_fit();
+
+        for(int i=0; i<spotLights.size(); i++){
+            delete spotLights[i];
+        }
+        spotLights.clear();
+        spotLights.shrink_to_fit();
+
+        exit(0);
     default:
         printf("You have pressed the wrong key\n");
         break;

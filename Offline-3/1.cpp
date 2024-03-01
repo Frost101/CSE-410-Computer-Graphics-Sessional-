@@ -11,7 +11,7 @@
 #define AMB 0
 #define DIFF 1
 #define SPEC 2
-#define REFL 3
+#define REF 3
 
 
 using namespace std;
@@ -35,6 +35,7 @@ class Ray;
 extern vector <Object*> objects;
 extern vector <PointLight*> pointLights;
 extern vector <SpotLight*> spotLights;
+extern int level_of_recursion;
 
 
 
@@ -244,20 +245,22 @@ public:
 
     Camera(){
         //* Set suitable eye values so that all the objects are visible
-        eye.x = 100;
-        eye.y = 100;
-        eye.z = 100;
+        //*Change
 
-        lookAt.x = -1/sqrt(3);
-        lookAt.y = -1/sqrt(3);
-        lookAt.z = -1/sqrt(3);
+        eye.x = 100.0;
+        eye.y = 100.0;
+        eye.z = 10.0;
+
+        lookAt.x = -1/sqrt(2.0);
+        lookAt.y = -1/sqrt(2.0);
+        lookAt.z = 0;
 
         up.x = 0;
         up.y = 0;
         up.z = 1;
 
-        right.x = -1/sqrt(2);
-        right.y = 1/sqrt(2);
+        right.x = -1/sqrt(2.0);
+        right.y = 1/sqrt(2.0);
         right.z = 0;
 
 
@@ -500,12 +503,16 @@ class Object
         Point reference_point;
         double height, width, length;
         Color color;
-        double coEfficients[4]; //* 0-ambient, 1-diffuse, 2-specular, 3-reflection coEfficients
+       
+       //* 0-ambient, 1-diffuse, 2-specular, 3-reflection coEfficients
+        vector<double> coEfficients;
 
         int shine;
 
 
         Object(){
+            coEfficients.resize(4);
+
             reference_point.x = 0;
             reference_point.y = 0;
             reference_point.z = 0;
@@ -561,6 +568,11 @@ class Object
         //* getColorAt function
         virtual Color getColorAt(Point p){
             return color;
+        }
+
+        ~Object(){
+            coEfficients.clear();
+            coEfficients.shrink_to_fit();
         }
 };
 
@@ -733,7 +745,7 @@ class Sphere: public Object
             }
 
     
-
+            //^ ------------------------------------------------------------
             //^ For pointLight Sources
             //* interSectionPoint = r->start + r->dir * t
             Point interSectionPoint;
@@ -836,6 +848,7 @@ class Sphere: public Object
 
 
 
+            //^ ------------------------------------------------------------
             //^ For spotLight Sources
             for(int i=0; i<spotLights.size(); i++){
                 SpotLight *sl = spotLights[i];
@@ -863,9 +876,9 @@ class Sphere: public Object
                     continue;
                 }
 
-                cout << "Angle: " << angle << endl;
-                cout << "Cutoff Angle: " << sl->cutoff_angle << endl;
-                cout << endl;
+                // cout << "Angle: " << angle << endl;
+                // cout << "Cutoff Angle: " << sl->cutoff_angle << endl;
+                // cout << endl;
 
                 Ray ray1(sl->pointLight.position, rayDirection);
 
@@ -934,7 +947,60 @@ class Sphere: public Object
 
             }
 
+            
+            //^ ------------------------------------------------------------
+            //^ Handle recursive reflection
+            if(level >= level_of_recursion){
+                return t;
+            }
+
+            //* Find reflected ray, rayr for ray
+            Point reflectedRayDir;
+            reflectedRayDir.x = r->dir.x - 2 * (normal.x * r->dir.x + normal.y * r->dir.y + normal.z * r->dir.z) * normal.x;
+            reflectedRayDir.y = r->dir.y - 2 * (normal.x * r->dir.x + normal.y * r->dir.y + normal.z * r->dir.z) * normal.y;
+            reflectedRayDir.z = r->dir.z - 2 * (normal.x * r->dir.x + normal.y * r->dir.y + normal.z * r->dir.z) * normal.z;
+
+            reflectedRayDir.normalize();
+
+            //* construct reflected ray from intersection point
+            //* actually slightly forward from the point (by moving
+            //* the start a little bit towards the reflection direction)
+            //* to avoid self intersection
+            Point startTmp;
+            startTmp.x = interSectionPoint.x + (0.0001 * reflectedRayDir.x);
+            startTmp.y = interSectionPoint.y + (0.0001 * reflectedRayDir.y);
+            startTmp.z = interSectionPoint.z + (0.0001 * reflectedRayDir.z);
+
+            Ray reflectedRay(startTmp, reflectedRayDir);
+
+
+            //* find tmin from the nearest intersecting object, using
+            //* intersect method as done in the capture() method
+            //* if found, call intersect(reflectedRay, color, level+1)
+            //* and update the color with the returned color
+
+            double tMin = PLUS_INF;
+            int nearestObjectIndex = -1;
+            double tTmp;
+            for(int m=0; m<objects.size(); m++){
+                tTmp = objects[m]->intersect(&reflectedRay, color, 0);
+                if(tTmp > 0 && (tTmp < tMin)){
+                    tMin = tTmp;
+                    nearestObjectIndex = m;
+                }
+            }
+
+            if(nearestObjectIndex != -1){
+                Color tempColor;
+                tTmp = objects[nearestObjectIndex]->intersect(&reflectedRay, &tempColor, level+1);
+                if(tTmp > 0){
+                    color->r += tempColor.r * coEfficients[REF];
+                    color->g += tempColor.g * coEfficients[REF];
+                    color->b += tempColor.b * coEfficients[REF];
+                }
+            }
             return t;
+
 
         }        
 
@@ -985,6 +1051,365 @@ class Triangle : public Object
             }
             glPopMatrix();
         }
+
+        double calculateDeterminant(const vector<std::vector<double>>& matrix) {
+            double determinant = matrix[0][0] * (matrix[1][1] * matrix[2][2] - matrix[1][2] * matrix[2][1]) -
+                                matrix[0][1] * (matrix[1][0] * matrix[2][2] - matrix[1][2] * matrix[2][0]) +
+                                matrix[0][2] * (matrix[1][0] * matrix[2][1] - matrix[1][1] * matrix[2][0]);
+
+            return determinant;
+        }
+
+        virtual double intersect(Ray *r, Color *color, int level){
+            double t;
+
+            //* construct 4 Matrix beta, gamma, tmat and A
+            vector<vector<double> > beta(3, vector<double>(3, 0));
+            vector<vector<double> > gamma(3, vector<double>(3, 0));
+            vector<vector<double> > tmat(3, vector<double>(3, 0));
+            vector<vector<double> > A(3, vector<double>(3, 0));
+
+            //* Constructing A
+            //* A = | a.x - b.x, a.x - c.x, r.dir.x |
+            //*     | a.y - b.y, a.y - c.y, r.dir.y |
+            //*     | a.z - b.z, a.z - c.z, r.dir.z |
+            A[0][0] = a.x - b.x, A[0][1] = a.x - c.x, A[0][2] = r->dir.x;
+            A[1][0] = a.y - b.y, A[1][1] = a.y - c.y, A[1][2] = r->dir.y;
+            A[2][0] = a.z - b.z, A[2][1] = a.z - c.z, A[2][2] = r->dir.z;
+
+            double determinantA = calculateDeterminant(A);
+
+            //* Constructing beta
+            //* beta = | a.x - r.start.x, a.x - c.x, r.dir.x |
+            //*        | a.y - r.start.y, a.y - c.y, r.dir.y |
+            //*        | a.z - r.start.z, a.z - c.z, r.dir.z |
+            beta[0][0] = a.x - r->start.x, beta[0][1] = a.x - c.x, beta[0][2] = r->dir.x;
+            beta[1][0] = a.y - r->start.y, beta[1][1] = a.y - c.y, beta[1][2] = r->dir.y;
+            beta[2][0] = a.z - r->start.z, beta[2][1] = a.z - c.z, beta[2][2] = r->dir.z;
+
+            double determinantBeta = calculateDeterminant(beta);
+
+            //* Constructing gamma
+            //* gamma = | a.x - b.x, a.x - r.start.x, r.dir.x |
+            //*         | a.y - b.y, a.y - r.start.y, r.dir.y |
+            //*         | a.z - b.z, a.z - r.start.z, r.dir.z |
+            gamma[0][0] = a.x - b.x, gamma[0][1] = a.x - r->start.x, gamma[0][2] = r->dir.x;
+            gamma[1][0] = a.y - b.y, gamma[1][1] = a.y - r->start.y, gamma[1][2] = r->dir.y;
+            gamma[2][0] = a.z - b.z, gamma[2][1] = a.z - r->start.z, gamma[2][2] = r->dir.z;
+
+            double determinantGamma = calculateDeterminant(gamma);
+
+            //* Constructing tmat
+            //* tmat = | a.x - b.x, a.x - c.x, a.x - r.start.x |
+            //*        | a.y - b.y, a.y - c.y, a.y - r.start.y |
+            //*        | a.z - b.z, a.z - c.z, a.z - r.start.z |
+            tmat[0][0] = a.x - b.x, tmat[0][1] = a.x - c.x, tmat[0][2] = a.x - r->start.x;
+            tmat[1][0] = a.y - b.y, tmat[1][1] = a.y - c.y, tmat[1][2] = a.y - r->start.y;
+            tmat[2][0] = a.z - b.z, tmat[2][1] = a.z - c.z, tmat[2][2] = a.z - r->start.z;
+
+            double determinantTmat = calculateDeterminant(tmat);
+
+            //* Calculate beta, gamma, t
+            if(determinantA == 0){
+                t = -1.0;
+            }
+            else{
+                double betaValue = determinantBeta / determinantA;
+                double gammaValue = determinantGamma / determinantA;
+                double tValue = determinantTmat / determinantA;
+
+                //* If beta, gamma, t are all positive
+                if(betaValue >= 0 && gammaValue >= 0 && (betaValue + gammaValue) < 1 && tValue > 0){
+                    t = tValue;
+                }
+                else{
+                    t = -1.0;
+                }
+            }
+            if(level == 0){
+                return t;
+            }
+
+            if(t < 0){
+                return -1.0;
+            }
+
+
+            //^ ------------------------------------------------------------
+            //^ For pointLight Sources
+            //* interSectionPoint = r->start + r->dir * t
+            Point interSectionPoint;
+            interSectionPoint.x = r->start.x + (r->dir.x * t);
+            interSectionPoint.y = r->start.y + (r->dir.y * t);
+            interSectionPoint.z = r->start.z + (r->dir.z * t);
+
+            //* interSectionPointColor = getColorAt(interSectionPoint)
+            Color interSectionPointColor = getColorAt(interSectionPoint);
+
+            //* color = interSectionPointColor * coEfficients[AMB]
+            getAmbientColor(color, &interSectionPointColor);
+
+            //* Calculate the normal at the intersection point
+            Point normal;
+            Point ab, ac;
+            ab.x = b.x - a.x;
+            ab.y = b.y - a.y;
+            ab.z = b.z - a.z;
+
+            ac.x = c.x - a.x;
+            ac.y = c.y - a.y;
+            ac.z = c.z - a.z;
+
+            normal.x = (ab.y * ac.z) - (ab.z * ac.y);
+            normal.y = (ab.z * ac.x) - (ab.x * ac.z);
+            normal.z = (ab.x * ac.y) - (ab.y * ac.x);
+
+            normal.normalize();
+
+            //* if(ray.dir . normal < 0) normal = -normal
+            //* else normal = normal
+            double dotProduct = (r->dir.x * normal.x) + (r->dir.y * normal.y) + (r->dir.z * normal.z);
+            if(dotProduct < 0){
+                normal.x = -normal.x;
+                normal.y = -normal.y;
+                normal.z = -normal.z;
+            }
+
+
+            //* For each point light pl in pointLights
+            //*     cast ray1 from pl.light_pos to interSectionPoint
+
+            for(int i=0; i<pointLights.size(); i++){
+                PointLight *pl = pointLights[i];
+                Point rayDirection ;
+                rayDirection.x = interSectionPoint.x - pl->position.x;
+                rayDirection.y = interSectionPoint.y - pl->position.y;
+                rayDirection.z = interSectionPoint.z - pl->position.z;  
+                rayDirection.normalize();
+
+                Ray ray1(pl->position, rayDirection);
+
+                //* if intersectionPoint is in shadow, the diffuse
+                //* and specular components need not be calculated
+                //* if ray1 is not obscured by any object
+                bool isObscured = false;
+
+                //* epsilon
+                double epsilon = 1e-5;
+
+                //* Calculate the length between the light source and the intersection point
+                //* If the length is less than epsilon, then the light source is inside the object
+                double length = sqrt((interSectionPoint.x - pl->position.x)*(interSectionPoint.x - pl->position.x) + (interSectionPoint.y - pl->position.y)*(interSectionPoint.y - pl->position.y) + (interSectionPoint.z - pl->position.z)*(interSectionPoint.z - pl->position.z));
+
+                if(length < epsilon){
+                    continue;
+                }
+
+                for(int j=0; j<objects.size(); j++){
+                    double tTmp = objects[j]->intersect(&ray1, color, 0);
+                    if(tTmp > 0 && (tTmp + epsilon) < length){
+                        isObscured = true;
+                        break;
+                    }
+                }
+
+
+                if(!isObscured){
+                    //* If ray1 is not obscured by any object
+                    //* Calculate lambertValue using normal, ray1
+                    double lambertValue = (normal.x * -rayDirection.x) + (normal.y * -rayDirection.y) + (normal.z * -rayDirection.z);
+                    if(lambertValue < 0){
+                        lambertValue = 0.0;
+                    }
+                    
+
+                    //* Find reflected ray, rayr for ray1
+                    Point reflectedRayDir;
+                    reflectedRayDir.x = ray1.dir.x - 2 * (normal.x * ray1.dir.x + normal.y * ray1.dir.y + normal.z * ray1.dir.z) * normal.x;
+                    reflectedRayDir.y = ray1.dir.y - 2 * (normal.x * ray1.dir.x + normal.y * ray1.dir.y + normal.z * ray1.dir.z) * normal.y;
+                    reflectedRayDir.z = ray1.dir.z - 2 * (normal.x * ray1.dir.x + normal.y * ray1.dir.y + normal.z * ray1.dir.z) * normal.z;
+
+                    reflectedRayDir.normalize();
+                    Ray reflectedRay(interSectionPoint, reflectedRayDir);
+
+                    //* Calculate the phong using r, reflectedRay
+                    double phong = (reflectedRayDir.x * -r->dir.x) + (reflectedRayDir.y * -r->dir.y) + (reflectedRayDir.z * -r->dir.z);
+                    if(phong < 0){
+                        phong = 0.0;
+                    }
+
+                    //*Update color using lambertValue, phong, pl.color, coEfficients[DIFF], coEfficients[SPEC]
+                    //* color += pl.color * (coEfficients[DIFF] * lambertValue * interSectionPointColor)
+                    //* color += pl.color * (coEfficients[SPEC] * pow(phong, shine) * interSectionPointColor)
+
+                    color->r += pl->color.r * (coEfficients[DIFF] * lambertValue * interSectionPointColor.r);
+                    color->r += pl->color.r * (coEfficients[SPEC] * pow(phong, shine) * interSectionPointColor.r);
+
+                    color->g += pl->color.g * (coEfficients[DIFF] * lambertValue * interSectionPointColor.g);
+                    color->g += pl->color.g * (coEfficients[SPEC] * pow(phong, shine) * interSectionPointColor.g);
+
+                    color->b += pl->color.b * (coEfficients[DIFF] * lambertValue * interSectionPointColor.b);
+                    color->b += pl->color.b * (coEfficients[SPEC] * pow(phong, shine) * interSectionPointColor.b);
+
+                }
+
+            }
+
+
+
+            //^ ------------------------------------------------------------
+            //^ For spotLight Sources
+            for(int i=0; i<spotLights.size(); i++){
+                SpotLight *sl = spotLights[i];
+                Point rayDirection ;
+                rayDirection.x = interSectionPoint.x - sl->pointLight.position.x;
+                rayDirection.y = interSectionPoint.y - sl->pointLight.position.y;
+                rayDirection.z = interSectionPoint.z - sl->pointLight.position.z;  
+                rayDirection.normalize();
+
+                //* Don't cast the ray from light_pos to intersectionPoint
+                //* if it exceeds cut-ff-angle for the light source
+                
+                //* dot product of rayDirection and light_direction
+                double dotProduct = (rayDirection.x * sl->light_direction.x) + (rayDirection.y * sl->light_direction.y) + (rayDirection.z * sl->light_direction.z);
+                //* angle = acos(dotProduct/ (|rayDirection| * |light_direction|))
+                double rayDirectionLength = sqrt(rayDirection.x*rayDirection.x + rayDirection.y*rayDirection.y + rayDirection.z*rayDirection.z);
+                double lightDirectionLength = sqrt(sl->light_direction.x*sl->light_direction.x + sl->light_direction.y*sl->light_direction.y + sl->light_direction.z*sl->light_direction.z);
+                double angle = acos(dotProduct / (rayDirectionLength * lightDirectionLength));
+                //* Convert the angle to degrees
+                angle = (angle * 180) / M_PI;
+
+                
+
+                if(angle > sl->cutoff_angle){
+                    continue;
+                }
+
+                // cout << "Angle: " << angle << endl;
+                // cout << "Cutoff Angle: " << sl->cutoff_angle << endl;
+                // cout << endl;
+
+                Ray ray1(sl->pointLight.position, rayDirection);
+
+                //* if intersectionPoint is in shadow, the diffuse
+                //* and specular components need not be calculated
+                //* if ray1 is not obscured by any object
+                bool isObscured = false;
+
+                //* epsilon
+                double epsilon = 1e-5;
+
+                //* Calculate the length between the light source and the intersection point
+                //* If the length is less than epsilon, then the light source is inside the object
+                double length = sqrt((interSectionPoint.x - sl->pointLight.position.x)*(interSectionPoint.x - sl->pointLight.position.x) + (interSectionPoint.y - sl->pointLight.position.y)*(interSectionPoint.y - sl->pointLight.position.y) + (interSectionPoint.z - sl->pointLight.position.z)*(interSectionPoint.z - sl->pointLight.position.z));
+
+                if(length < epsilon){
+                    continue;
+                }
+
+                for(int j=0; j<objects.size(); j++){
+                    double tTmp = objects[j]->intersect(&ray1, color, 0);
+                    if(tTmp > 0 && (tTmp + epsilon) < length){
+                        isObscured = true;
+                        break;
+                    }
+                }
+
+
+                if(!isObscured){
+                    //* If ray1 is not obscured by any object
+                    //* Calculate lambertValue using normal, ray1
+                    double lambertValue = (normal.x * -rayDirection.x) + (normal.y * -rayDirection.y) + (normal.z * -rayDirection.z);
+                    if(lambertValue < 0){
+                        lambertValue = 0.0;
+                    }
+                    
+
+                    //* Find reflected ray, rayr for ray1
+                    Point reflectedRayDir;
+                    reflectedRayDir.x = ray1.dir.x - 2 * (normal.x * ray1.dir.x + normal.y * ray1.dir.y + normal.z * ray1.dir.z) * normal.x;
+                    reflectedRayDir.y = ray1.dir.y - 2 * (normal.x * ray1.dir.x + normal.y * ray1.dir.y + normal.z * ray1.dir.z) * normal.y;
+                    reflectedRayDir.z = ray1.dir.z - 2 * (normal.x * ray1.dir.x + normal.y * ray1.dir.y + normal.z * ray1.dir.z) * normal.z;
+
+                    reflectedRayDir.normalize();
+                    Ray reflectedRay(interSectionPoint, reflectedRayDir);
+
+                    //* Calculate the phong using r, reflectedRay
+                    double phong = (reflectedRayDir.x * -r->dir.x) + (reflectedRayDir.y * -r->dir.y) + (reflectedRayDir.z * -r->dir.z);
+                    if(phong < 0){
+                        phong = 0.0;
+                    }
+
+                    //*Update color using lambertValue, phong, pl.color, coEfficients[DIFF], coEfficients[SPEC]
+                    //* color += pl.color * (coEfficients[DIFF] * lambertValue * interSectionPointColor)
+                    //* color += pl.color * (coEfficients[SPEC] * pow(phong, shine) * interSectionPointColor)
+
+                    color->r += sl->pointLight.color.r * (coEfficients[DIFF] * lambertValue * interSectionPointColor.r);
+                    color->r += sl->pointLight.color.r * (coEfficients[SPEC] * pow(phong, shine) * interSectionPointColor.r);
+
+                    color->g += sl->pointLight.color.g * (coEfficients[DIFF] * lambertValue * interSectionPointColor.g);
+                    color->g += sl->pointLight.color.g * (coEfficients[SPEC] * pow(phong, shine) * interSectionPointColor.g);
+
+                    color->b += sl->pointLight.color.b * (coEfficients[DIFF] * lambertValue * interSectionPointColor.b);
+                    color->b += sl->pointLight.color.b * (coEfficients[SPEC] * pow(phong, shine) * interSectionPointColor.b);
+                }
+
+            }
+
+            
+            //^ ------------------------------------------------------------
+            //^ Handle recursive reflection
+            if(level >= level_of_recursion){
+                return t;
+            }
+
+            //* Find reflected ray, rayr for ray
+            Point reflectedRayDir;
+            reflectedRayDir.x = r->dir.x - 2 * (normal.x * r->dir.x + normal.y * r->dir.y + normal.z * r->dir.z) * normal.x;
+            reflectedRayDir.y = r->dir.y - 2 * (normal.x * r->dir.x + normal.y * r->dir.y + normal.z * r->dir.z) * normal.y;
+            reflectedRayDir.z = r->dir.z - 2 * (normal.x * r->dir.x + normal.y * r->dir.y + normal.z * r->dir.z) * normal.z;
+
+            reflectedRayDir.normalize();
+
+            //* construct reflected ray from intersection point
+            //* actually slightly forward from the point (by moving
+            //* the start a little bit towards the reflection direction)
+            //* to avoid self intersection
+            Point startTmp;
+            startTmp.x = interSectionPoint.x + (0.0001 * reflectedRayDir.x);
+            startTmp.y = interSectionPoint.y + (0.0001 * reflectedRayDir.y);
+            startTmp.z = interSectionPoint.z + (0.0001 * reflectedRayDir.z);
+
+            Ray reflectedRay(startTmp, reflectedRayDir);
+
+
+            //* find tmin from the nearest intersecting object, using
+            //* intersect method as done in the capture() method
+            //* if found, call intersect(reflectedRay, color, level+1)
+            //* and update the color with the returned color
+
+            double tMin = PLUS_INF;
+            int nearestObjectIndex = -1;
+            double tTmp;
+            for(int m=0; m<objects.size(); m++){
+                tTmp = objects[m]->intersect(&reflectedRay, color, 0);
+                if(tTmp > 0 && (tTmp < tMin)){
+                    tMin = tTmp;
+                    nearestObjectIndex = m;
+                }
+            }
+
+            if(nearestObjectIndex != -1){
+                Color tempColor;
+                tTmp = objects[nearestObjectIndex]->intersect(&reflectedRay, &tempColor, level+1);
+                if(tTmp > 0){
+                    color->r += tempColor.r * coEfficients[REF];
+                    color->g += tempColor.g * coEfficients[REF];
+                    color->b += tempColor.b * coEfficients[REF];
+                }
+            }
+            return t;
+        }
 };
 
 
@@ -995,7 +1420,7 @@ class General : public Object
     public:
         double A, B, C, D, E, F, G, H, I, J;
 
-        General(double A, double B, double C, double D, double E, double F, double G, double H, double I, double J, Color color, double ambient, double diffuse, double specular, double reflection, int shine){
+        General(double A, double B, double C, double D, double E, double F, double G, double H, double I, double J, Color color, double ambient, double diffuse, double specular, double reflection, int shine, Point cube_reference_point, double length, double width, double height){
             this->A = A;
             this->B = B;
             this->C = C;
@@ -1017,12 +1442,388 @@ class General : public Object
             coEfficients[3] = reflection;
 
             this->shine = shine;
+
+            this->reference_point.x = cube_reference_point.x;
+            this->reference_point.y = cube_reference_point.y;
+            this->reference_point.z = cube_reference_point.z;
+
+            this->length = length;
+            this->width = width;
+            this->height = height;
+
+
+
         }
 
         virtual void draw(){
             //* Do Nothing
             return;
         }
+
+        virtual double intersect(Ray *r, Color *color, int level){
+            double t = -1.0;
+            double tMax, tMin = -1.0;
+
+            double a = (A * r->dir.x * r->dir.x) + (B * r->dir.y * r->dir.y )+ (C * r->dir.z * r->dir.z) + (D * r->dir.x * r->dir.y) + (E * r->dir.y * r->dir.z) + (F * r->dir.z * r->dir.x);
+            double b = (2 * A * r->start.x * r->dir.x) + (2 * B * r->start.y * r->dir.y) + (2 * C * r->start.z * r->dir.z) + (D * r->start.x * r->dir.y) + (D * r->start.y * r->dir.x) + (E * r->start.y * r->dir.z) + (E * r->start.z * r->dir.y) + (F * r->start.z * r->dir.x) + (F * r->start.x * r->dir.z) + (G * r->dir.x) + (H * r->dir.y) + (I * r->dir.z);
+            double c = (A * r->start.x * r->start.x) + (B * r->start.y * r->start.y) + (C * r->start.z * r->start.z) + (D * r->start.x * r->start.y) + (E * r->start.y * r->start.z) + (F * r->start.z * r->start.x) + (G * r->start.x) + (H * r->start.y) + (I * r->start.z) + J;
+            double determinant = b * b - 4 * a * c;
+
+            if(determinant < 0){
+                tMax = tMin = -1.0;
+            }
+            else{
+                double t1 = (-b + sqrt(determinant)) / (2 * a * 1.0);
+                double t2 = (-b - sqrt(determinant)) / (2 * a * 1.0);
+
+                if(determinant == 0){
+                    tMin = -b / (2 * a * 1.0);
+                    tMax = -1.0;
+                }
+                else{
+                    tMax = max(t1, t2);
+                    tMin = min(t1, t2);
+                }
+            }
+
+
+
+            //* If two values of t are obtained , check which one(or none or both) falls within the reference cube
+            //* i.e the bounding box within which the general quadric surface needs to be drawn.
+            //* IF any dimention of the bounding box is 0, no clipping along that dimension is required
+
+            if(tMin > 0){
+                Point intersectionPoint;
+                intersectionPoint.x = r->start.x + (r->dir.x * tMin);
+                intersectionPoint.y = r->start.y + (r->dir.y * tMin);
+                intersectionPoint.z = r->start.z + (r->dir.z * tMin);
+
+                if(length > 0){
+                    if(intersectionPoint.x < reference_point.x || intersectionPoint.x > (reference_point.x + length)){
+                        tMin = -1.0;
+                    }
+                }
+
+                if(width > 0){
+                    if(intersectionPoint.y < reference_point.y || intersectionPoint.y > (reference_point.y + width)){
+                        tMin = -1.0;
+                    }
+                }
+
+                if(height > 0){
+                    if(intersectionPoint.z < reference_point.z || intersectionPoint.z > (reference_point.z + height)){
+                        tMin = -1.0;
+                    }
+                }
+            }
+
+            if(tMax > 0){
+                Point intersectionPoint;
+                intersectionPoint.x = r->start.x + (r->dir.x * tMax);
+                intersectionPoint.y = r->start.y + (r->dir.y * tMax);
+                intersectionPoint.z = r->start.z + (r->dir.z * tMax);
+
+                if(length > 0){
+                    if(intersectionPoint.x < reference_point.x || intersectionPoint.x > (reference_point.x + length)){
+                        tMax = -1.0;
+                    }
+                }
+
+                if(width > 0){
+                    if(intersectionPoint.y < reference_point.y || intersectionPoint.y > (reference_point.y + width)){
+                        tMax = -1.0;
+                    }
+                }
+
+                if(height > 0){
+                    if(intersectionPoint.z < reference_point.z || intersectionPoint.z > (reference_point.z + height)){
+                        tMax = -1.0;
+                    }
+                }
+            }
+
+            if(tMin > 0 && tMax > 0){
+                t = min(tMin, tMax);
+            }
+            else if(tMin > 0){
+                t = tMin;
+            }
+            else if(tMax > 0){
+                t = tMax;
+            }
+            else{
+                t = -1.0;
+            }
+
+            if(level == 0){
+                return t;
+            }
+
+            if(t < 0){
+                return -1.0;
+            }
+
+            //^ ------------------------------------------------------------
+            //^ For pointLight Sources
+            //* interSectionPoint = r->start + r->dir * t
+            Point interSectionPoint;
+            interSectionPoint.x = r->start.x + (r->dir.x * t);
+            interSectionPoint.y = r->start.y + (r->dir.y * t);
+            interSectionPoint.z = r->start.z + (r->dir.z * t);
+
+            //* interSectionPointColor = getColorAt(interSectionPoint)
+            Color interSectionPointColor = getColorAt(interSectionPoint);
+
+            //* color = interSectionPointColor * coEfficients[AMB]
+            getAmbientColor(color, &interSectionPointColor);
+
+            //* Calculate the normal at the intersection point
+            Point normal;
+
+            normal.x = 2 * A * interSectionPoint.x + D * interSectionPoint.y + F * interSectionPoint.z + G;
+            normal.y = 2 * B * interSectionPoint.y + D * interSectionPoint.x + E * interSectionPoint.z + H;
+            normal.z = 2 * C * interSectionPoint.z + E * interSectionPoint.y + F * interSectionPoint.x + I;
+
+            normal.normalize();
+
+
+
+
+            //* For each point light pl in pointLights
+            //*     cast ray1 from pl.light_pos to interSectionPoint
+
+            for(int i=0; i<pointLights.size(); i++){
+                PointLight *pl = pointLights[i];
+                Point rayDirection ;
+                rayDirection.x = interSectionPoint.x - pl->position.x;
+                rayDirection.y = interSectionPoint.y - pl->position.y;
+                rayDirection.z = interSectionPoint.z - pl->position.z;  
+                rayDirection.normalize();
+
+                Ray ray1(pl->position, rayDirection);
+
+                //* if intersectionPoint is in shadow, the diffuse
+                //* and specular components need not be calculated
+                //* if ray1 is not obscured by any object
+                bool isObscured = false;
+
+                //* epsilon
+                double epsilon = 1e-5;
+
+                //* Calculate the length between the light source and the intersection point
+                //* If the length is less than epsilon, then the light source is inside the object
+                double length = sqrt((interSectionPoint.x - pl->position.x)*(interSectionPoint.x - pl->position.x) + (interSectionPoint.y - pl->position.y)*(interSectionPoint.y - pl->position.y) + (interSectionPoint.z - pl->position.z)*(interSectionPoint.z - pl->position.z));
+
+                if(length < epsilon){
+                    continue;
+                }
+
+                for(int j=0; j<objects.size(); j++){
+                    double tTmp = objects[j]->intersect(&ray1, color, 0);
+                    if(tTmp > 0 && (tTmp + epsilon) < length){
+                        isObscured = true;
+                        break;
+                    }
+                }
+
+
+                if(!isObscured){
+                    //* If ray1 is not obscured by any object
+                    //* Calculate lambertValue using normal, ray1
+                    double lambertValue = (normal.x * -rayDirection.x) + (normal.y * -rayDirection.y) + (normal.z * -rayDirection.z);
+                    if(lambertValue < 0){
+                        lambertValue = 0.0;
+                    }
+                    
+
+                    //* Find reflected ray, rayr for ray1
+                    Point reflectedRayDir;
+                    reflectedRayDir.x = ray1.dir.x - 2 * (normal.x * ray1.dir.x + normal.y * ray1.dir.y + normal.z * ray1.dir.z) * normal.x;
+                    reflectedRayDir.y = ray1.dir.y - 2 * (normal.x * ray1.dir.x + normal.y * ray1.dir.y + normal.z * ray1.dir.z) * normal.y;
+                    reflectedRayDir.z = ray1.dir.z - 2 * (normal.x * ray1.dir.x + normal.y * ray1.dir.y + normal.z * ray1.dir.z) * normal.z;
+
+                    reflectedRayDir.normalize();
+                    Ray reflectedRay(interSectionPoint, reflectedRayDir);
+
+                    //* Calculate the phong using r, reflectedRay
+                    double phong = (reflectedRayDir.x * -r->dir.x) + (reflectedRayDir.y * -r->dir.y) + (reflectedRayDir.z * -r->dir.z);
+                    if(phong < 0){
+                        phong = 0.0;
+                    }
+
+                    //*Update color using lambertValue, phong, pl.color, coEfficients[DIFF], coEfficients[SPEC]
+                    //* color += pl.color * (coEfficients[DIFF] * lambertValue * interSectionPointColor)
+                    //* color += pl.color * (coEfficients[SPEC] * pow(phong, shine) * interSectionPointColor)
+
+                    color->r += pl->color.r * (coEfficients[DIFF] * lambertValue * interSectionPointColor.r);
+                    color->r += pl->color.r * (coEfficients[SPEC] * pow(phong, shine) * interSectionPointColor.r);
+
+                    color->g += pl->color.g * (coEfficients[DIFF] * lambertValue * interSectionPointColor.g);
+                    color->g += pl->color.g * (coEfficients[SPEC] * pow(phong, shine) * interSectionPointColor.g);
+
+                    color->b += pl->color.b * (coEfficients[DIFF] * lambertValue * interSectionPointColor.b);
+                    color->b += pl->color.b * (coEfficients[SPEC] * pow(phong, shine) * interSectionPointColor.b);
+
+                }
+
+            }
+
+
+
+            //^ ------------------------------------------------------------
+            //^ For spotLight Sources
+            for(int i=0; i<spotLights.size(); i++){
+                SpotLight *sl = spotLights[i];
+                Point rayDirection ;
+                rayDirection.x = interSectionPoint.x - sl->pointLight.position.x;
+                rayDirection.y = interSectionPoint.y - sl->pointLight.position.y;
+                rayDirection.z = interSectionPoint.z - sl->pointLight.position.z;  
+                rayDirection.normalize();
+
+                //* Don't cast the ray from light_pos to intersectionPoint
+                //* if it exceeds cut-ff-angle for the light source
+                
+                //* dot product of rayDirection and light_direction
+                double dotProduct = (rayDirection.x * sl->light_direction.x) + (rayDirection.y * sl->light_direction.y) + (rayDirection.z * sl->light_direction.z);
+                //* angle = acos(dotProduct/ (|rayDirection| * |light_direction|))
+                double rayDirectionLength = sqrt(rayDirection.x*rayDirection.x + rayDirection.y*rayDirection.y + rayDirection.z*rayDirection.z);
+                double lightDirectionLength = sqrt(sl->light_direction.x*sl->light_direction.x + sl->light_direction.y*sl->light_direction.y + sl->light_direction.z*sl->light_direction.z);
+                double angle = acos(dotProduct / (rayDirectionLength * lightDirectionLength));
+                //* Convert the angle to degrees
+                angle = (angle * 180) / M_PI;
+
+                
+
+                if(angle > sl->cutoff_angle){
+                    continue;
+                }
+
+                // cout << "Angle: " << angle << endl;
+                // cout << "Cutoff Angle: " << sl->cutoff_angle << endl;
+                // cout << endl;
+
+                Ray ray1(sl->pointLight.position, rayDirection);
+
+                //* if intersectionPoint is in shadow, the diffuse
+                //* and specular components need not be calculated
+                //* if ray1 is not obscured by any object
+                bool isObscured = false;
+
+                //* epsilon
+                double epsilon = 1e-5;
+
+                //* Calculate the length between the light source and the intersection point
+                //* If the length is less than epsilon, then the light source is inside the object
+                double length = sqrt((interSectionPoint.x - sl->pointLight.position.x)*(interSectionPoint.x - sl->pointLight.position.x) + (interSectionPoint.y - sl->pointLight.position.y)*(interSectionPoint.y - sl->pointLight.position.y) + (interSectionPoint.z - sl->pointLight.position.z)*(interSectionPoint.z - sl->pointLight.position.z));
+
+                if(length < epsilon){
+                    continue;
+                }
+
+                for(int j=0; j<objects.size(); j++){
+                    double tTmp = objects[j]->intersect(&ray1, color, 0);
+                    if(tTmp > 0 && (tTmp + epsilon) < length){
+                        isObscured = true;
+                        break;
+                    }
+                }
+
+
+                if(!isObscured){
+                    //* If ray1 is not obscured by any object
+                    //* Calculate lambertValue using normal, ray1
+                    double lambertValue = (normal.x * -rayDirection.x) + (normal.y * -rayDirection.y) + (normal.z * -rayDirection.z);
+                    if(lambertValue < 0){
+                        lambertValue = 0.0;
+                    }
+                    
+
+                    //* Find reflected ray, rayr for ray1
+                    Point reflectedRayDir;
+                    reflectedRayDir.x = ray1.dir.x - 2 * (normal.x * ray1.dir.x + normal.y * ray1.dir.y + normal.z * ray1.dir.z) * normal.x;
+                    reflectedRayDir.y = ray1.dir.y - 2 * (normal.x * ray1.dir.x + normal.y * ray1.dir.y + normal.z * ray1.dir.z) * normal.y;
+                    reflectedRayDir.z = ray1.dir.z - 2 * (normal.x * ray1.dir.x + normal.y * ray1.dir.y + normal.z * ray1.dir.z) * normal.z;
+
+                    reflectedRayDir.normalize();
+                    Ray reflectedRay(interSectionPoint, reflectedRayDir);
+
+                    //* Calculate the phong using r, reflectedRay
+                    double phong = (reflectedRayDir.x * -r->dir.x) + (reflectedRayDir.y * -r->dir.y) + (reflectedRayDir.z * -r->dir.z);
+                    if(phong < 0){
+                        phong = 0.0;
+                    }
+
+                    //*Update color using lambertValue, phong, pl.color, coEfficients[DIFF], coEfficients[SPEC]
+                    //* color += pl.color * (coEfficients[DIFF] * lambertValue * interSectionPointColor)
+                    //* color += pl.color * (coEfficients[SPEC] * pow(phong, shine) * interSectionPointColor)
+
+                    color->r += sl->pointLight.color.r * (coEfficients[DIFF] * lambertValue * interSectionPointColor.r);
+                    color->r += sl->pointLight.color.r * (coEfficients[SPEC] * pow(phong, shine) * interSectionPointColor.r);
+
+                    color->g += sl->pointLight.color.g * (coEfficients[DIFF] * lambertValue * interSectionPointColor.g);
+                    color->g += sl->pointLight.color.g * (coEfficients[SPEC] * pow(phong, shine) * interSectionPointColor.g);
+
+                    color->b += sl->pointLight.color.b * (coEfficients[DIFF] * lambertValue * interSectionPointColor.b);
+                    color->b += sl->pointLight.color.b * (coEfficients[SPEC] * pow(phong, shine) * interSectionPointColor.b);
+                }
+
+            }
+
+            
+            //^ ------------------------------------------------------------
+            //^ Handle recursive reflection
+            if(level >= level_of_recursion){
+                return t;
+            }
+
+            //* Find reflected ray, rayr for ray
+            Point reflectedRayDir;
+            reflectedRayDir.x = r->dir.x - 2 * (normal.x * r->dir.x + normal.y * r->dir.y + normal.z * r->dir.z) * normal.x;
+            reflectedRayDir.y = r->dir.y - 2 * (normal.x * r->dir.x + normal.y * r->dir.y + normal.z * r->dir.z) * normal.y;
+            reflectedRayDir.z = r->dir.z - 2 * (normal.x * r->dir.x + normal.y * r->dir.y + normal.z * r->dir.z) * normal.z;
+
+            reflectedRayDir.normalize();
+
+            //* construct reflected ray from intersection point
+            //* actually slightly forward from the point (by moving
+            //* the start a little bit towards the reflection direction)
+            //* to avoid self intersection
+            Point startTmp;
+            startTmp.x = interSectionPoint.x + (0.0001 * reflectedRayDir.x);
+            startTmp.y = interSectionPoint.y + (0.0001 * reflectedRayDir.y);
+            startTmp.z = interSectionPoint.z + (0.0001 * reflectedRayDir.z);
+
+            Ray reflectedRay(startTmp, reflectedRayDir);
+
+
+            //* find tmin from the nearest intersecting object, using
+            //* intersect method as done in the capture() method
+            //* if found, call intersect(reflectedRay, color, level+1)
+            //* and update the color with the returned color
+
+            tMin = PLUS_INF;
+            int nearestObjectIndex = -1;
+            double tTmp;
+            for(int m=0; m<objects.size(); m++){
+                tTmp = objects[m]->intersect(&reflectedRay, color, 0);
+                if(tTmp > 0 && (tTmp < tMin)){
+                    tMin = tTmp;
+                    nearestObjectIndex = m;
+                }
+            }
+
+            if(nearestObjectIndex != -1){
+                Color tempColor;
+                tTmp = objects[nearestObjectIndex]->intersect(&reflectedRay, &tempColor, level+1);
+                if(tTmp > 0){
+                    color->r += tempColor.r * coEfficients[REF];
+                    color->g += tempColor.g * coEfficients[REF];
+                    color->b += tempColor.b * coEfficients[REF];
+                }
+            }
+            return t;
+        }
+        
 };
 
 
@@ -1152,7 +1953,7 @@ class Floor : public Object
 
 
     
-
+            //^ ------------------------------------------------------------
             //^ For pointLight Sources
             //* interSectionPoint = r->start + r->dir * t
             Point interSectionPoint;
@@ -1249,8 +2050,160 @@ class Floor : public Object
 
             }
 
-            return t;
 
+
+            //^ ------------------------------------------------------------
+            //^ For spotLight Sources
+            for(int i=0; i<spotLights.size(); i++){
+                SpotLight *sl = spotLights[i];
+                Point rayDirection ;
+                rayDirection.x = interSectionPoint.x - sl->pointLight.position.x;
+                rayDirection.y = interSectionPoint.y - sl->pointLight.position.y;
+                rayDirection.z = interSectionPoint.z - sl->pointLight.position.z;  
+                rayDirection.normalize();
+
+                //* Don't cast the ray from light_pos to intersectionPoint
+                //* if it exceeds cut-ff-angle for the light source
+                
+                //* dot product of rayDirection and light_direction
+                double dotProduct = (rayDirection.x * sl->light_direction.x) + (rayDirection.y * sl->light_direction.y) + (rayDirection.z * sl->light_direction.z);
+                //* angle = acos(dotProduct/ (|rayDirection| * |light_direction|))
+                double rayDirectionLength = sqrt(rayDirection.x*rayDirection.x + rayDirection.y*rayDirection.y + rayDirection.z*rayDirection.z);
+                double lightDirectionLength = sqrt(sl->light_direction.x*sl->light_direction.x + sl->light_direction.y*sl->light_direction.y + sl->light_direction.z*sl->light_direction.z);
+                double angle = acos(dotProduct / (rayDirectionLength * lightDirectionLength));
+                //* Convert the angle to degrees
+                angle = (angle * 180) / M_PI;
+
+                
+
+                if(angle > sl->cutoff_angle){
+                    continue;
+                }
+
+                // cout << "Angle: " << angle << endl;
+                // cout << "Cutoff Angle: " << sl->cutoff_angle << endl;
+                // cout << endl;
+
+                Ray ray1(sl->pointLight.position, rayDirection);
+
+                //* if intersectionPoint is in shadow, the diffuse
+                //* and specular components need not be calculated
+                //* if ray1 is not obscured by any object
+                bool isObscured = false;
+
+                //* epsilon
+                double epsilon = 1e-5;
+
+                //* Calculate the length between the light source and the intersection point
+                //* If the length is less than epsilon, then the light source is inside the object
+                double length = sqrt((interSectionPoint.x - sl->pointLight.position.x)*(interSectionPoint.x - sl->pointLight.position.x) + (interSectionPoint.y - sl->pointLight.position.y)*(interSectionPoint.y - sl->pointLight.position.y) + (interSectionPoint.z - sl->pointLight.position.z)*(interSectionPoint.z - sl->pointLight.position.z));
+
+                if(length < epsilon){
+                    continue;
+                }
+
+                for(int j=0; j<objects.size(); j++){
+                    double tTmp = objects[j]->intersect(&ray1, color, 0);
+                    if(tTmp > 0 && (tTmp + epsilon) < length){
+                        isObscured = true;
+                        break;
+                    }
+                }
+
+
+                if(!isObscured){
+                    //* If ray1 is not obscured by any object
+                    //* Calculate lambertValue using normal, ray1
+                    double lambertValue = (normal.x * -rayDirection.x) + (normal.y * -rayDirection.y) + (normal.z * -rayDirection.z);
+                    if(lambertValue < 0){
+                        lambertValue = 0.0;
+                    }
+                    
+
+                    //* Find reflected ray, rayr for ray1
+                    Point reflectedRayDir;
+                    reflectedRayDir.x = ray1.dir.x - 2 * (normal.x * ray1.dir.x + normal.y * ray1.dir.y + normal.z * ray1.dir.z) * normal.x;
+                    reflectedRayDir.y = ray1.dir.y - 2 * (normal.x * ray1.dir.x + normal.y * ray1.dir.y + normal.z * ray1.dir.z) * normal.y;
+                    reflectedRayDir.z = ray1.dir.z - 2 * (normal.x * ray1.dir.x + normal.y * ray1.dir.y + normal.z * ray1.dir.z) * normal.z;
+
+                    reflectedRayDir.normalize();
+                    Ray reflectedRay(interSectionPoint, reflectedRayDir);
+
+                    //* Calculate the phong using r, reflectedRay
+                    double phong = (reflectedRayDir.x * -r->dir.x) + (reflectedRayDir.y * -r->dir.y) + (reflectedRayDir.z * -r->dir.z);
+                    if(phong < 0){
+                        phong = 0.0;
+                    }
+
+                    //*Update color using lambertValue, phong, pl.color, coEfficients[DIFF], coEfficients[SPEC]
+                    //* color += pl.color * (coEfficients[DIFF] * lambertValue * interSectionPointColor)
+                    //* color += pl.color * (coEfficients[SPEC] * pow(phong, shine) * interSectionPointColor)
+
+                    color->r += sl->pointLight.color.r * (coEfficients[DIFF] * lambertValue * interSectionPointColor.r);
+                    color->r += sl->pointLight.color.r * (coEfficients[SPEC] * pow(phong, shine) * interSectionPointColor.r);
+
+                    color->g += sl->pointLight.color.g * (coEfficients[DIFF] * lambertValue * interSectionPointColor.g);
+                    color->g += sl->pointLight.color.g * (coEfficients[SPEC] * pow(phong, shine) * interSectionPointColor.g);
+
+                    color->b += sl->pointLight.color.b * (coEfficients[DIFF] * lambertValue * interSectionPointColor.b);
+                    color->b += sl->pointLight.color.b * (coEfficients[SPEC] * pow(phong, shine) * interSectionPointColor.b);
+                }
+
+            }
+
+            
+            //^ ------------------------------------------------------------
+            //^ Handle recursive reflection
+            if(level >= level_of_recursion){
+                return t;
+            }
+
+            //* Find reflected ray, rayr for ray
+            Point reflectedRayDir;
+            reflectedRayDir.x = r->dir.x - 2 * (normal.x * r->dir.x + normal.y * r->dir.y + normal.z * r->dir.z) * normal.x;
+            reflectedRayDir.y = r->dir.y - 2 * (normal.x * r->dir.x + normal.y * r->dir.y + normal.z * r->dir.z) * normal.y;
+            reflectedRayDir.z = r->dir.z - 2 * (normal.x * r->dir.x + normal.y * r->dir.y + normal.z * r->dir.z) * normal.z;
+
+            reflectedRayDir.normalize();
+
+            //* construct reflected ray from intersection point
+            //* actually slightly forward from the point (by moving
+            //* the start a little bit towards the reflection direction)
+            //* to avoid self intersection
+            Point startTmp;
+            startTmp.x = interSectionPoint.x + (0.0001 * reflectedRayDir.x);
+            startTmp.y = interSectionPoint.y + (0.0001 * reflectedRayDir.y);
+            startTmp.z = interSectionPoint.z + (0.0001 * reflectedRayDir.z);
+
+            Ray reflectedRay(startTmp, reflectedRayDir);
+
+
+            //* find tmin from the nearest intersecting object, using
+            //* intersect method as done in the capture() method
+            //* if found, call intersect(reflectedRay, color, level+1)
+            //* and update the color with the returned color
+
+            double tMin = PLUS_INF;
+            int nearestObjectIndex = -1;
+            double tTmp;
+            for(int m=0; m<objects.size(); m++){
+                tTmp = objects[m]->intersect(&reflectedRay, color, 0);
+                if(tTmp > 0 && (tTmp < tMin)){
+                    tMin = tTmp;
+                    nearestObjectIndex = m;
+                }
+            }
+
+            if(nearestObjectIndex != -1){
+                Color tempColor;
+                tTmp = objects[nearestObjectIndex]->intersect(&reflectedRay, &tempColor, level+1);
+                if(tTmp > 0){
+                    color->r += tempColor.r * coEfficients[REF];
+                    color->g += tempColor.g * coEfficients[REF];
+                    color->b += tempColor.b * coEfficients[REF];
+                }
+            }
+            return t;
         }
 };
 

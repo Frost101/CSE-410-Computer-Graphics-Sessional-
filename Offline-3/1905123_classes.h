@@ -276,6 +276,12 @@ public:
 
     }
 
+    void normalizeUPRightLookAt(){
+        this->normalize(&lookAt);
+        this->normalize(&up);
+        this->normalize(&right);
+    }
+
     void setAngleRate(double rate){
         angleRate = rate;
     }
@@ -333,18 +339,24 @@ public:
         eye.x += (moveRate * (lookAt.x));
         eye.y += (moveRate * (lookAt.y));
         eye.z += (moveRate * (lookAt.z));
+
+        normalizeUPRightLookAt();
     }
 
     void moveBackward(){
         eye.x -= (moveRate * (lookAt.x));
         eye.y -= (moveRate * (lookAt.y));
         eye.z -= (moveRate * (lookAt.z));
+
+        normalizeUPRightLookAt();
     }
 
     void moveRight(){
         eye.x += (moveRate * (right.x));
         eye.y += (moveRate * (right.y));
         eye.z += (moveRate * (right.z));
+
+        normalizeUPRightLookAt();
     }
 
     void moveLeft(){
@@ -352,12 +364,17 @@ public:
         eye.y -= (moveRate * (right.y));
         eye.z -= (moveRate * (right.z));
 
+
+        normalizeUPRightLookAt();
+
     }
 
     void moveUp(){
         eye.x += (moveRate * (up.x));
         eye.y += (moveRate * (up.y));
         eye.z += (moveRate * (up.z));
+
+        normalizeUPRightLookAt();
     }
 
 
@@ -392,6 +409,8 @@ public:
         lookAt.x = temp.x - normalizedEye.x;
         lookAt.y = temp.y - normalizedEye.y;
         lookAt.z = temp.z - normalizedEye.z;
+
+        normalizeUPRightLookAt();
     }
 
     void downWithNoRefChange(){
@@ -425,37 +444,54 @@ public:
         lookAt.x = temp.x - normalizedEye.x;
         lookAt.y = temp.y - normalizedEye.y;
         lookAt.z = temp.z - normalizedEye.z;
+
+
+        normalizeUPRightLookAt();
     }
 
     void moveDown(){
         eye.x -= (moveRate * (up.x));
         eye.y -= (moveRate * (up.y));
         eye.z -= (moveRate * (up.z));
+
+        normalizeUPRightLookAt();
     }
 
 
     void rotateLeft(){
-        rotate(&right, &lookAt, angleRate);    
+        rotate(&right, &lookAt, angleRate); 
+
+        normalizeUPRightLookAt();   
     }
 
     void rotateRight(){
-        rotate(&right, &lookAt, -angleRate);      
+        rotate(&right, &lookAt, -angleRate);  
+
+        normalizeUPRightLookAt();    
     }
 
     void lookUp(){
         rotate(&lookAt, &up, angleRate);
+
+        normalizeUPRightLookAt();
     }
 
     void lookDown(){
         rotate(&lookAt, &up, -angleRate);
+
+        normalizeUPRightLookAt();
     }
 
     void tiltClockwise(){
         rotate(&up, &right, -angleRate);
+
+        normalizeUPRightLookAt();
     }
 
     void tiltAntiClockwise(){
         rotate(&up, &right, angleRate);
+
+        normalizeUPRightLookAt();
     }
 
 };
@@ -1425,8 +1461,8 @@ class General : public Object
             this->B = B;
             this->C = C;
             this->D = D;
-            this->E = E;
-            this->F = F;
+            this->E = F;
+            this->F = E;
             this->G = G;
             this->H = H;
             this->I = I;
