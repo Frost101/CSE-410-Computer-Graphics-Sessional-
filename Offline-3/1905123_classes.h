@@ -503,12 +503,16 @@ class Object
         Point reference_point;
         double height, width, length;
         Color color;
-        double coEfficients[4]; //* 0-ambient, 1-diffuse, 2-specular, 3-reflection coEfficients
+       
+       //* 0-ambient, 1-diffuse, 2-specular, 3-reflection coEfficients
+        vector<double> coEfficients;
 
         int shine;
 
 
         Object(){
+            coEfficients.resize(4);
+
             reference_point.x = 0;
             reference_point.y = 0;
             reference_point.z = 0;
@@ -564,6 +568,11 @@ class Object
         //* getColorAt function
         virtual Color getColorAt(Point p){
             return color;
+        }
+
+        ~Object(){
+            coEfficients.clear();
+            coEfficients.shrink_to_fit();
         }
 };
 

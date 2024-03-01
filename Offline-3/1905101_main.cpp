@@ -143,9 +143,9 @@ void Capture(){
     }
 
     //* Save the image
-    string file_name = "out" + to_string(image_count) + ".bmp";
+    string file_name = "Output_" + to_string(image_count) + ".bmp";
     image.save_image(file_name);
-    cout << "Image saved" << endl;
+    cout << "Image saved : " << file_name << endl;
     image_count++;
 
 
